@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "kula-pos-staging"
+  },
+  "targets": {
+    "kula-pos-staging": {
+      "hosting": {
+        "pet-app": [
+          "kula-pet-staging"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
