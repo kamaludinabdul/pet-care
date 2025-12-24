@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useData } from '../context/DataContext';
+import { usePOS } from '../context/POSContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { AlertCircle } from 'lucide-react';
 
 const PointAdjustmentDialog = ({ open, onOpenChange, customer, onSuccess }) => {
-    const { adjustCustomerPoints, refreshData } = useData();
+    const { adjustCustomerPoints, refreshData } = usePOS();
     const [type, setType] = useState('deduction'); // 'deduction' or 'addition'
     const [amount, setAmount] = useState('');
     const [reason, setReason] = useState('');

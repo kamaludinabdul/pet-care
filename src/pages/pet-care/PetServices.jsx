@@ -36,6 +36,7 @@ const PetServices = () => {
 
     useEffect(() => {
         fetchServices();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storeId]);
 
     const fetchServices = async () => {
@@ -53,7 +54,7 @@ const PetServices = () => {
             serviceData.sort((a, b) => a.name.localeCompare(b.name));
             setServices(serviceData);
         } catch (error) {
-            console.error("Error fetching services:", error);
+            console.error("PetServices.jsx: Error fetching services (products):", error);
         } finally {
             setLoading(false);
         }

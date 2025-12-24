@@ -1,13 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase'; // Adjust path if needed
-import { collection, query, where, getDocs, deleteDoc, doc, orderBy } from 'firebase/firestore';
-import { useData } from '../../context/DataContext';
+import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { usePOS } from '../../context/POSContext';
 import { useAuth } from '../../context/AuthContext'; // Import useAuth
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
-import { Plus, Search, Edit, Trash2, User as UserIcon } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, User as UserIcon, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { Badge } from '../../components/ui/badge';
@@ -15,7 +16,7 @@ import { formatAge } from '../../lib/utils';
 
 const PetList = () => {
     const { user } = useAuth(); // Get user from AuthContext
-    const { stores, customers } = useData(); // Get stores/customers from DataContext
+    const { customers } = usePOS(); // Get stores/customers from DataContext
     const navigate = useNavigate();
     const [pets, setPets] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -60,7 +61,7 @@ const PetList = () => {
         fetchPets();
     }, [storeId]);
 
-    // const { customers } = useData(); // Already destructured above
+    // const { customers } = usePOS(); // Already destructured above
 
     const getOwnerName = (ownerId) => {
         const customer = customers.find(c => c.id === ownerId);
@@ -69,6 +70,7 @@ const PetList = () => {
 
     const filteredPets = pets.filter(pet =>
         pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (pet.medicalRecordNumber && pet.medicalRecordNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
         getOwnerName(pet.ownerId).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -121,6 +123,7 @@ const PetList = () => {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead>No. RM</TableHead>
                                 <TableHead>Nama Hewan</TableHead>
                                 <TableHead>Jenis/Ras</TableHead>
                                 <TableHead>Pemilik</TableHead>
@@ -132,17 +135,20 @@ const PetList = () => {
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8">Memuat...</TableCell>
+                                    <TableCell colSpan={7} className="text-center py-8">Memuat...</TableCell>
                                 </TableRow>
                             ) : filteredPets.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                                         Belum ada data hewan.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 filteredPets.map((pet) => (
                                     <TableRow key={pet.id}>
+                                        <TableCell className="font-mono text-xs text-slate-500">
+                                            {pet.medicalRecordNumber || '-'}
+                                        </TableCell>
                                         <TableCell className="font-medium">{pet.name}</TableCell>
                                         <TableCell>
                                             <div className="flex flex-col">
@@ -161,6 +167,18 @@ const PetList = () => {
                                             <div className="space-y-1 text-xs">
                                                 <div>Umur: {formatAge(pet.birthDate)}</div>
                                                 <div>Berat: {pet.weight ? pet.weight + ' kg' : '-'}</div>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {pet.isNeutered && (
+                                                        <Badge variant="outline" className="text-[10px] px-1 py-0 border-pink-200 text-pink-600 bg-pink-50">
+                                                            Steril
+                                                        </Badge>
+                                                    )}
+                                                    {pet.isVaccinated && (
+                                                        <Badge variant="outline" className="text-[10px] px-1 py-0 border-sky-200 text-sky-600 bg-sky-50">
+                                                            Vaksin
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -168,7 +186,16 @@ const PetList = () => {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    onClick={() => navigate(`/pet-care/pets/edit/${pet.id}`)}
+                                                    title="Lihat Detail & Riwayat"
+                                                    className="text-indigo-600 hover:text-indigo-700"
+                                                    onClick={() => navigate(`/pet-care/patients/${pet.id}`)}
+                                                >
+                                                    <FileText className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => navigate(`/ pet - care / pets / edit / ${pet.id} `)}
                                                 >
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
@@ -195,7 +222,7 @@ const PetList = () => {
                 onClose={() => setIsDeleteOpen(false)}
                 onConfirm={confirmDelete}
                 title="Hapus Hewan"
-                description={`Apakah Anda yakin ingin menghapus "${petToDelete?.name}"? Data yang dihapus tidak dapat dikembalikan.`}
+                description={`Apakah Anda yakin ingin menghapus "${petToDelete?.name}" ? Data yang dihapus tidak dapat dikembalikan.`}
                 confirmText="Hapus"
                 variant="destructive"
             />

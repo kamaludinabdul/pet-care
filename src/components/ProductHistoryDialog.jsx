@@ -15,11 +15,11 @@ import {
     TableRow
 } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { useData } from '../context/DataContext';
+import { usePOS } from '../context/POSContext';
 import { Loader2, ArrowUp, ArrowDown, History } from 'lucide-react';
 
 const ProductHistoryDialog = ({ isOpen, onClose, product }) => {
-    const { stockMovements } = useData();
+    const { stockMovements } = usePOS();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
 

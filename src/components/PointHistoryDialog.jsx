@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useData } from '../context/DataContext';
+import { usePOS } from '../context/POSContext';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { Loader2 } from 'lucide-react';
 
 const PointHistoryDialog = ({ open, onOpenChange, customer }) => {
-    const { getPointAdjustmentHistory } = useData();
+    const { getPointAdjustmentHistory } = usePOS();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
 

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit2, Trash2, Shield, User, Circle, History, Eye, EyeOff } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, updateDoc, deleteDoc, doc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
-import { useData } from '../context/DataContext';
+import { AVAILABLE_PERMISSIONS, normalizePermissions } from '../utils/permissions';
+import { useStores } from '../context/StoresContext';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -19,7 +20,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 
 const Staff = () => {
     const { user } = useAuth();
-    const { activeStoreId, stores, addUser } = useData();
+    const { activeStoreId, stores, addUser } = useStores();
     const [staffList, setStaffList] = useState([]);
     const [activeShifts, setActiveShifts] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -101,12 +102,7 @@ const Staff = () => {
             password: '',
             photo: '',
             petCareAccess: false,
-            permissions: {
-                view_reports: false,
-                manage_staff: false,
-                manage_settings: false,
-                delete_records: false
-            }
+            permissions: {} // Dynamic permissions
         });
         setIsEditing(false);
         setShowPassword(false);
@@ -124,12 +120,7 @@ const Staff = () => {
             password: staff.password || staff.pin || '', // Fallback to PIN
             photo: staff.photo || '',
             petCareAccess: staff.petCareAccess || false,
-            permissions: staff.permissions || {
-                view_reports: false,
-                manage_staff: false,
-                manage_settings: false,
-                delete_records: false
-            }
+            permissions: staff.permissions || {}
         });
         setIsEditing(true);
         setShowPassword(false);
@@ -455,7 +446,7 @@ const Staff = () => {
                         <div className="space-y-3 pt-4 border-t">
                             <Label className="text-base font-semibold">Hak Akses & Izin</Label>
 
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 pb-4">
                                 <input
                                     type="checkbox"
                                     id="petCareAccess"
@@ -468,52 +459,34 @@ const Staff = () => {
                                 </Label>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="view_reports"
-                                        checked={currentStaff.permissions?.view_reports || false}
-                                        onChange={(e) => setCurrentStaff({
-                                            ...currentStaff,
-                                            permissions: { ...currentStaff.permissions, view_reports: e.target.checked }
-                                        })}
-                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                    />
-                                    <Label htmlFor="view_reports" className="font-normal cursor-pointer text-sm">
-                                        Lihat Laporan Keuangan
-                                    </Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="manage_staff"
-                                        checked={currentStaff.permissions?.manage_staff || false}
-                                        onChange={(e) => setCurrentStaff({
-                                            ...currentStaff,
-                                            permissions: { ...currentStaff.permissions, manage_staff: e.target.checked }
-                                        })}
-                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                    />
-                                    <Label htmlFor="manage_staff" className="font-normal cursor-pointer text-sm">
-                                        Kelola Staff
-                                    </Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="delete_records"
-                                        checked={currentStaff.permissions?.delete_records || false}
-                                        onChange={(e) => setCurrentStaff({
-                                            ...currentStaff,
-                                            permissions: { ...currentStaff.permissions, delete_records: e.target.checked }
-                                        })}
-                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                    />
-                                    <Label htmlFor="delete_records" className="font-normal cursor-pointer text-sm">
-                                        Hapus Data Penting
-                                    </Label>
-                                </div>
+                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 border rounded-md p-3 bg-slate-50">
+                                {AVAILABLE_PERMISSIONS.filter(p => p.category).map((group, idx) => (
+                                    <div key={idx} className="space-y-2">
+                                        <h4 className="text-sm font-semibold text-slate-700 uppercase tracking-wider text-[10px]">{group.category}</h4>
+                                        <div className="space-y-2">
+                                            {group.items.map(perm => (
+                                                <div key={perm.id} className="flex items-start space-x-2 bg-white p-2 rounded border border-slate-100">
+                                                    <input
+                                                        type="checkbox"
+                                                        id={perm.id}
+                                                        checked={currentStaff.permissions?.[perm.id] || false}
+                                                        onChange={(e) => setCurrentStaff({
+                                                            ...currentStaff,
+                                                            permissions: { ...currentStaff.permissions, [perm.id]: e.target.checked }
+                                                        })}
+                                                        className="h-4 w-4 mt-0.5 rounded border-gray-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <div className="flex flex-col">
+                                                        <Label htmlFor={perm.id} className="font-medium cursor-pointer text-sm text-slate-800">
+                                                            {perm.label}
+                                                        </Label>
+                                                        <span className="text-[10px] text-slate-500">{perm.description}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                         <DialogFooter>

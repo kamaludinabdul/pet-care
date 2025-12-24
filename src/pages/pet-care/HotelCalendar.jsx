@@ -60,8 +60,8 @@ const HotelCalendar = ({ bookings, getPetName }) => {
                     </div>
                 </div>
                 <div className="flex gap-2 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-blue-100 border border-blue-200"></div> Check-In</div>
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-green-100 border border-green-200"></div> Active</div>
+                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-indigo-500"></div> Confirmed</div>
+                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500"></div> Checked In</div>
                 </div>
             </div>
 
@@ -78,39 +78,42 @@ const HotelCalendar = ({ bookings, getPetName }) => {
 
                 {/* Days */}
                 <div className="grid grid-cols-7 flex-1 auto-rows-fr">
-                    {days.map((day, dayIdx) => {
+                    {days.map((day) => {
                         const dayBookings = getBookingsForDate(day);
                         const isToday = isSameDay(day, new Date());
 
                         return (
                             <div
                                 key={day.toString()}
-                                className={`min-h-[100px] border-b border-r border-slate-100 p-2 transition-colors hover:bg-slate-50 ${!isSameMonth(day, monthStart) ? 'bg-slate-50/50 text-slate-400' : 'bg-white'
+                                className={`min-h-[120px] border-b border-r border-slate-100 p-1 transition-colors hover:bg-slate-50 ${!isSameMonth(day, monthStart) ? 'bg-slate-50/50 text-slate-400' : 'bg-white'
                                     }`}
                             >
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className={`text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-slate-700'
+                                <div className="flex justify-between items-start mb-1 px-1">
+                                    <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-slate-700'
                                         }`}>
                                         {format(day, dateFormat)}
                                     </span>
                                 </div>
-                                <div className="flex flex-col gap-1 overflow-y-auto max-h-[80px]">
-                                    {dayBookings.map(booking => (
-                                        <div
-                                            key={booking.id}
-                                            className={`text-[10px] px-1.5 py-0.5 rounded truncate border ${booking.status === 'checked_in'
-                                                    ? 'bg-purple-50 text-purple-700 border-purple-100'
-                                                    : 'bg-blue-50 text-blue-700 border-blue-100'
-                                                }`}
-                                        >
-                                            {getPetName(booking.petId)}
-                                        </div>
-                                    ))}
-                                    {dayBookings.length > 3 && (
-                                        <div className="text-[10px] text-slate-400 pl-1">
-                                            + {dayBookings.length - 3} more
-                                        </div>
-                                    )}
+                                <div className="flex flex-col gap-1 overflow-y-auto max-h-[100px] px-1">
+                                    {dayBookings.map(booking => {
+                                        // Find room name from items
+                                        const roomItem = booking.items?.find(i => i.type === 'room_booking');
+                                        const roomName = roomItem ? roomItem.name : 'Unknown Room';
+
+                                        return (
+                                            <div
+                                                key={booking.id}
+                                                className={`text-[10px] px-1.5 py-1 rounded border truncate flex flex-col leading-tight ${booking.status === 'checked_in'
+                                                    ? 'bg-green-50 text-green-700 border-green-200'
+                                                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                                    }`}
+                                                title={`${roomName} - ${booking.petName} (${booking.customer?.name})`}
+                                            >
+                                                <span className="font-bold">{roomName}</span>
+                                                <span className="opacity-90">{booking.petName}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         );

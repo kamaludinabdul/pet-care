@@ -6,111 +6,33 @@ import { collection, getDocs, addDoc, setDoc, updateDoc, deleteDoc, doc, query, 
 
 
 import { useAuth } from './AuthContext';
+import { useStores } from './StoresContext';
 import { normalizePermissions } from '../utils/permissions';
 import { checkPlanLimit, PLAN_LIMITS } from '../utils/planLimits';
-import { initializeApp, deleteApp } from "firebase/app";
-import { getAuth as getAuthSecondary, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { firebaseConfig } from '../firebase';
 
-const DataContext = createContext(null);
 
-export const DataProvider = ({ children }) => {
+const POSContext = createContext(null);
+
+export const POSProvider = ({ children }) => {
     const { user } = useAuth();
+    // Use Stores Context for Store Data
+    const {
+        activeStoreId,
+        currentStore
+    } = useStores();
+
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [customers, setCustomers] = useState([]);
-    const [stores, setStores] = useState([]);
+    // const [stores, setStores] = useState([]); // Moved to StoresContext
     const [stockMovements, setStockMovements] = useState([]);
     const [salesTargets, setSalesTargets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [lastFetchError, setLastFetchError] = useState(null);
 
-    // For Super Admin to switch views
-    const [selectedStoreId, setSelectedStoreId] = useState(null);
-
-    // Determine the effective store ID to use for queries
-    const activeStoreId = user?.storeId || selectedStoreId;
-    const currentStore = stores.find(s => s.id === activeStoreId) || null;
-
-
-
-    const addStore = async (storeData) => {
-        try {
-            const docRef = await addDoc(collection(db, 'stores'), {
-                ...storeData,
-                createdAt: new Date().toISOString()
-            });
-            fetchData();
-            return { success: true, id: docRef.id };
-        } catch (error) {
-            console.error("Error adding store:", error);
-            return { success: false, error };
-        }
-    };
-
-    const updateStore = async (id, data) => {
-        console.log('Updating store:', id);
-        console.log('Data to update:', data);
-
-        try {
-            const storeRef = doc(db, 'stores', id);
-            await updateDoc(storeRef, data);
-            fetchData();
-            return { success: true };
-        } catch (error) {
-            console.error("Error updating store:", error);
-            console.error("Error details:", error.code, error.message);
-            return { success: false, error };
-        }
-    };
-
-    const deleteStore = async (id) => {
-        try {
-            await deleteDoc(doc(db, 'stores', id));
-            fetchData();
-            return { success: true };
-        } catch (error) {
-            console.error("Error deleting store:", error);
-            return { success: false, error };
-        }
-    };
-
-    const updateStoreSettings = async (settings) => {
-        console.log('Updating store settings for:', activeStoreId);
-
-        if (!activeStoreId) {
-            console.error('ERROR: No active store ID!');
-            return { success: false, error: 'No active store ID' };
-        }
-
-        try {
-            const storeRef = doc(db, 'stores', activeStoreId);
-            await updateDoc(storeRef, settings);
-            fetchData();
-            return { success: true };
-        } catch (error) {
-            console.error("Error updating store settings:", error);
-            return { success: false, error };
-        }
-    };
-
-    const fetchStores = useCallback(async () => {
-        try {
-            const snapshot = await getDocs(collection(db, 'stores'));
-            const storesList = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    permissions: normalizePermissions(data.permissions)
-                };
-            });
-            setStores(storesList);
-        } catch (error) {
-            console.error("Failed to fetch stores:", error);
-        }
-    }, []);
+    // activeStoreId is now from useStores()
+    // currentStore is now from useStores()
 
     const fetchStockMovements = useCallback(async () => {
         if (!activeStoreId) return;
@@ -136,25 +58,8 @@ export const DataProvider = ({ children }) => {
         if (shouldSetLoading) setLoading(true);
         try {
             console.log("Fetching data for user:", user?.email, "Role:", user?.role, "StoreId:", user?.storeId);
-            // 1. Fetch Stores Logic
-            if (user.role === 'super_admin') {
-                // Super Admin gets all stores
-                await fetchStores();
-            } else if (user.storeId) {
-                // Regular users get only their assigned store
-                const storeDoc = await getDocs(query(collection(db, 'stores'), where('__name__', '==', user.storeId)));
-                if (!storeDoc.empty) {
-                    const storesList = storeDoc.docs.map(doc => {
-                        const data = doc.data();
-                        return {
-                            id: doc.id,
-                            ...data,
-                            permissions: normalizePermissions(data.permissions)
-                        };
-                    });
-                    setStores(storesList);
-                }
-            }
+
+            // Store Fetching Logic Removed (Handled by StoresContext)
 
             // 2. Fetch Operational Data
             // Only fetch operational data if we have an active store context
@@ -230,122 +135,12 @@ export const DataProvider = ({ children }) => {
         } finally {
             setLoading(false);
         }
-    }, [user, activeStoreId, fetchStores]);
+    }, [user, activeStoreId]);
 
     useEffect(() => {
         fetchData(true);
     }, [fetchData]);
 
-    // --- User Management ---
-    const addUser = async (userData) => {
-        try {
-            // Check Plan Limits
-            const targetStore = stores.find(s => s.id === userData.storeId);
-            const storePlan = targetStore?.plan || 'free';
-
-            // Get current user count for this store
-            const q = query(collection(db, 'users'), where('storeId', '==', userData.storeId));
-            const snapshot = await getDocs(q);
-            const currentCount = snapshot.size;
-
-            const limitCheck = checkPlanLimit(storePlan, 'users', currentCount);
-
-            if (!limitCheck.allowed) {
-                return {
-                    success: false,
-                    error: 'Plan limit reached.Upgrade to add more users. (Limit: ' + limitCheck.limit + ')',
-                    isLimitError: true,
-                    limitType: 'users',
-                    debugInfo: {
-                        plan: storePlan,
-                        limit: limitCheck.limit,
-                        currentCount: currentCount
-                    }
-                };
-            }
-
-            // Check Role Limits
-            const roleCheck = checkPlanLimit(storePlan, 'roles', userData.role);
-            if (!roleCheck.allowed) {
-                return {
-                    success: false,
-                    error: 'Role \'' + userData.role + '\' tidak tersedia di paket ' + storePlan + '. Upgrade untuk akses.',
-                    isLimitError: true,
-                    limitType: 'roles'
-                };
-            }
-
-            let uid = null;
-
-            // If email is provided, create Firebase Auth user
-            if (userData.email && userData.password) {
-                try {
-                    // Initialize a secondary app to create user without logging out current user
-                    const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
-                    const secondaryAuth = getAuthSecondary(secondaryApp);
-
-                    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, userData.email, userData.password);
-                    uid = userCredential.user.uid;
-
-                    // Cleanup secondary app
-                    await deleteApp(secondaryApp);
-                } catch (authError) {
-                    if (authError.code === 'auth/email-already-in-use') {
-                        // Email exists in Auth. Try to sign in to verify ownership/password
-                        try {
-                            const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp_Check_" + Date.now()); // Unique name
-                            const secondaryAuth = getAuthSecondary(secondaryApp);
-
-                            // Use standard import, dynamic import might be causing issues in some bundlers if not configured
-                            const userCredential = await signInWithEmailAndPassword(secondaryAuth, userData.email, userData.password);
-
-                            // If login successful, reuse this UID
-                            uid = userCredential.user.uid;
-
-                            await deleteApp(secondaryApp);
-                        } catch (loginError) {
-                            console.error("Failed to reclaim existing auth user:", loginError);
-                            return { success: false, error: "Email sudah terdaftar. Jika ini email Anda, pastikan password yang dimasukkan BENAR (sama dengan password akun sebelumnya)." };
-                        }
-                    } else {
-                        console.error("Error creating auth user:", authError);
-                        let msg = authError.message;
-                        if (authError.code === 'auth/weak-password') msg = "Password terlalu lemah (min 6 karakter).";
-                        return { success: false, error: msg };
-                    }
-                }
-            }
-
-            const newUserProfile = {
-                ...userData,
-                createdAt: new Date().toISOString()
-            };
-
-            if (uid) {
-                // Use the Auth UID as the document ID
-                await setDoc(doc(db, 'users', uid), newUserProfile);
-            } else {
-                // Use auto-generated ID if no Auth user created
-                await addDoc(collection(db, 'users'), newUserProfile);
-            }
-
-            return { success: true };
-        } catch (error) {
-            console.error("Error adding user:", error);
-            return { success: false, error: error.message };
-        }
-    };
-
-    const fetchUsersByStore = async (storeId) => {
-        try {
-            const q = query(collection(db, 'users'), where('storeId', '==', storeId));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        } catch (error) {
-            console.error("Error fetching users:", error);
-            return [];
-        }
-    };
 
     // --- Operational Data Management ---
 
@@ -1562,29 +1357,17 @@ export const DataProvider = ({ children }) => {
     };
 
     return (
-        <DataContext.Provider value={{
+        <POSContext.Provider value={{
             categories,
             products,
             transactions,
-            // stockMovements, // No longer provided globally as initial data
             stockMovements, // Still provided but might be empty initially
             fetchStockMovements, // Exposed for lazy loading
             customers,
-            stores,
-            activeStoreId,
-            currentStore,
             loading,
-            selectedStoreId,
-            setSelectedStoreId,
-            addStore,
-            updateStore,
-            deleteStore,
-            updateStoreSettings,
             voidTransaction,
             processRefund,
             processDebtPayment,
-            addUser,
-            fetchUsersByStore,
             addCategory,
             updateCategory,
             deleteCategory,
@@ -1612,8 +1395,8 @@ export const DataProvider = ({ children }) => {
             lastFetchError
         }}>
             {children}
-        </DataContext.Provider>
+        </POSContext.Provider>
     );
 };
 
-export const useData = () => useContext(DataContext);
+export const usePOS = () => useContext(POSContext);

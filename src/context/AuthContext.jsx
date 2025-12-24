@@ -116,20 +116,35 @@ export const AuthProvider = ({ children }) => {
             if (userDoc.exists()) {
                 const userData = { id: userDoc.id, ...userDoc.data() };
 
-                // CHECK STORE PERMISSIONS
-                if (userData.storeId) {
+                // CHECK PERMISSIONS
+                // 1. Super Admin Bypass (Always Allowed)
+                if (userData.role === 'super_admin') {
+                    // Allowed
+                }
+                // 2. Regular Users Check
+                else if (userData.storeId) {
                     const storeRef = doc(db, 'stores', userData.storeId);
                     const storeSnap = await getDoc(storeRef);
 
                     if (storeSnap.exists()) {
                         const storeData = storeSnap.data();
 
-                        // Strict Gate: Block if Pet Care is not enabled
+                        // Check 1: Store Level (Must be enabled for the store)
                         if (!storeData.petCareEnabled) {
                             await signOut(auth);
                             return {
                                 success: false,
                                 message: "Akses Ditolak: Fitur Pet Care belum diaktifkan untuk toko ini. Hubungi Admin."
+                            };
+                        }
+
+                        // Check 2: User Level (Must have granular access)
+                        // Note: 'admin' role (Store Owner) implies access if store has access
+                        if (userData.role !== 'admin' && !userData.petCareAccess) {
+                            await signOut(auth);
+                            return {
+                                success: false,
+                                message: "Akses Ditolak: Akun Anda tidak memiliki izin akses aplikasi Pet Care. Hubungi Manager."
                             };
                         }
                     }
@@ -200,7 +215,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const signup = async (email, password, name, storeName) => {
+    const signup = async (email, password, name, storeName, appType = 'pos_petcare') => {
         try {
             // 1. Check if store name already exists
             const storesRef = collection(db, 'stores');
@@ -230,7 +245,10 @@ export const AuthProvider = ({ children }) => {
                 status: 'active',
                 settings: {
                     currency: 'IDR',
-                    taxRate: 0
+                    taxRate: 0,
+                    appType: appType, // 'pos_petcare' or 'petcare_only'
+                    petCareEnabled: true, // Always enable if registering via this app
+                    posEnabled: appType === 'pos_petcare'
                 }
             });
 

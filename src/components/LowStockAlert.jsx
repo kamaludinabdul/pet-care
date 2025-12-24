@@ -1,5 +1,5 @@
 import React from 'react';
-import { useData } from '../context/DataContext';
+import { usePOS } from '../context/POSContext';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { AlertTriangle, Package } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 
 const LowStockAlert = ({ threshold = 10, showDetails = false }) => {
-    const { products } = useData();
+    const { products } = usePOS();
     const navigate = useNavigate();
 
     // Filter products with low stock

@@ -12,6 +12,7 @@ import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { Badge } from '../../components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval, isSameDay, addMonths, subMonths, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 
@@ -25,6 +26,7 @@ const Rooms = () => {
     const [currentRoom, setCurrentRoom] = useState(null);
     const [roomToDelete, setRoomToDelete] = useState(null);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [filterStatus, setFilterStatus] = useState('all');
 
     // Form State
     const [formData, setFormData] = useState({
@@ -34,7 +36,7 @@ const Rooms = () => {
         price: 0,
     });
 
-    const [activeTab, setActiveTab] = useState('list'); // 'list' or 'calendar'
+    const [activeTab, setActiveTab] = useState('grid'); // Default to grid for management
     const [bookings, setBookings] = useState([]);
     const [viewDate, setViewDate] = useState(new Date());
 
@@ -43,6 +45,7 @@ const Rooms = () => {
     useEffect(() => {
         fetchRooms();
         fetchBookings();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storeId]);
 
     const fetchRooms = async () => {
@@ -199,7 +202,7 @@ const Rooms = () => {
                     </div>
                     <div className="flex gap-3 text-sm">
                         <div className="flex items-center gap-2"><div className="w-3 h-3 bg-green-100 border border-green-300 rounded"></div> Tersedia</div>
-                        <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-100 border border-red-300 rounded"></div> Terisi</div>
+                        <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-100 border border-blue-300 rounded"></div> Terisi</div>
                     </div>
                 </div>
 
@@ -225,16 +228,41 @@ const Rooms = () => {
                                 </div>
                                 {days.map(day => {
                                     const booking = getOccupancy(room, day);
+                                    if (booking) {
+                                        return (
+                                            <Popover key={day.toString()}>
+                                                <PopoverTrigger asChild>
+                                                    <div
+                                                        className="w-10 flex-shrink-0 border-r bg-blue-100 hover:bg-blue-200 cursor-pointer border-blue-200 transition-colors"
+                                                    />
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-64 p-3 font-sans text-sm">
+                                                    <div className="space-y-2">
+                                                        <h4 className="font-semibold leading-none border-b pb-2">Detail Reservasi</h4>
+                                                        <div className="grid grid-cols-3 gap-1">
+                                                            <span className="text-muted-foreground text-xs col-span-1">Hewan:</span>
+                                                            <span className="font-medium col-span-2 capitalize">{booking.petName}</span>
+
+                                                            <span className="text-muted-foreground text-xs col-span-1">Pemilik:</span>
+                                                            <span className="font-medium col-span-2 capitalize">{booking.ownerName}</span>
+
+                                                            <span className="text-muted-foreground text-xs col-span-1">Masuk:</span>
+                                                            <span className="col-span-2">{format(parseISO(booking.startDate), 'dd MMM yyyy', { locale: idLocale })}</span>
+
+                                                            <span className="text-muted-foreground text-xs col-span-1">Keluar:</span>
+                                                            <span className="col-span-2">{booking.endDate ? format(parseISO(booking.endDate), 'dd MMM yyyy', { locale: idLocale }) : '-'}</span>
+                                                        </div>
+                                                    </div>
+                                                </PopoverContent>
+                                            </Popover>
+                                        );
+                                    }
                                     return (
                                         <div
                                             key={day.toString()}
-                                            className={`w-10 flex-shrink-0 border-r transition-colors ${booking
-                                                ? 'bg-red-100 hover:bg-red-200 cursor-pointer border-red-200'
-                                                : 'text-center'
-                                                }`}
-                                            title={booking ? `Booked by: ${booking.ownerId || 'Unknown'}` : 'Available'}
+                                            className="w-10 flex-shrink-0 border-r text-center bg-transparent"
                                         >
-                                            {/* Could show partial bar or icon */}
+                                            {/* Empty */}
                                         </div>
                                     );
                                 })}
@@ -246,16 +274,20 @@ const Rooms = () => {
         );
     };
 
-    const filteredRooms = rooms.filter(room =>
-        room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        room.type.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredRooms = rooms.filter(room => {
+        const matchesSearch = room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            room.type.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = filterStatus === 'all'
+            ? true
+            : (room.status || 'available') === filterStatus;
+        return matchesSearch && matchesStatus;
+    });
 
     return (
-        <div className="p-4 space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="p-6 w-full space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Kamar Hotel</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Ketersediaan Kamar</h1>
                     <p className="text-muted-foreground">Kelola data kamar dan cek ketersediaan.</p>
                 </div>
                 {activeTab === 'list' && (
@@ -299,6 +331,17 @@ const Rooms = () => {
                                 className="pl-8"
                             />
                         </div>
+                        <Select value={filterStatus} onValueChange={setFilterStatus}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Filter Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Semua Status</SelectItem>
+                                <SelectItem value="available">Tersedia</SelectItem>
+                                <SelectItem value="occupied">Terisi</SelectItem>
+                                <SelectItem value="maintenance">Maintenance</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <Card>
                         <CardContent className="p-0">
@@ -339,9 +382,13 @@ const Rooms = () => {
                                                 <TableCell>{room.capacity} Hewan</TableCell>
                                                 <TableCell>Rp {room.price.toLocaleString()}</TableCell>
                                                 <TableCell>
-                                                    <Badge className="bg-green-100 text-green-800 border-green-200">
-                                                        Tersedia
-                                                    </Badge>
+                                                    {room.status === 'occupied' ? (
+                                                        <Badge className="bg-blue-100 text-blue-800 border-blue-200">Terisi</Badge>
+                                                    ) : room.status === 'maintenance' ? (
+                                                        <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Maintenance</Badge>
+                                                    ) : (
+                                                        <Badge className="bg-green-100 text-green-800 border-green-200">Tersedia</Badge>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-2">

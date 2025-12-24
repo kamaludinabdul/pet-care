@@ -1,3 +1,44 @@
+
+export const AVAILABLE_PERMISSIONS = [
+    {
+        id: 'pos',
+        label: 'Akses POS (Kasir)',
+        description: 'Bisa melakukan transaksi, buka/tutup shift.',
+        defaultFor: ['admin', 'staff', 'sales']
+    },
+    {
+        id: 'pet_care_access', // Special flag handled separately in UI but good to list
+        label: 'Akses Pet Care',
+        description: 'Bisa login ke aplikasi Pet Care.',
+        defaultFor: ['dokter', 'paramedis']
+    },
+    {
+        category: 'Produk & Stok',
+        items: [
+            { id: 'products.manage', label: 'Kelola Produk', description: 'Tambah, edit, hapus produk.' },
+            { id: 'products.stock', label: 'Kelola Stok', description: 'Input stok masuk, opname.' },
+            { id: 'products.categories', label: 'Kelola Kategori', description: 'Atur kategori produk.' }
+        ]
+    },
+    {
+        category: 'Laporan',
+        items: [
+            { id: 'reports.view', label: 'Lihat Laporan Dasar', description: 'Akses menu laporan.' },
+            { id: 'reports.profit_loss', label: 'Laporan Laba Rugi', description: 'Lihat profit & loss.' },
+            { id: 'reports.financial', label: 'Laporan Keuangan', description: 'Semua laporan keuangan sensitif.' }
+        ]
+    },
+    {
+        category: 'Administrasi',
+        items: [
+            { id: 'manage_staff', label: 'Kelola Staff', description: 'Tambah/Edit/Hapus user.' },
+            { id: 'manage_settings', label: 'Pengaturan Toko', description: 'Ubah info toko, printer, dll.' },
+            { id: 'delete_records', label: 'Hapus Data Penting', description: 'Hapus transaksi/data master.' }
+        ]
+    }
+];
+
+
 // Helper function to normalize and ensure complete permissions
 export const normalizePermissions = (permissions) => {
     if (!permissions) {

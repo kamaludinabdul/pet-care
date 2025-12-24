@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { collection, doc, getDoc, updateDoc, runTransaction } from 'firebase/firestore';
-import { useData } from '../../context/DataContext';
+import { usePOS } from '../../context/POSContext';
 import { useAuth } from '../../context/AuthContext'; // Import useAuth
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -26,7 +26,7 @@ const COMMON_VACCINES = {
 const PetForm = () => {
     const { id } = useParams(); // If present, we are editing
     const navigate = useNavigate();
-    const { customers } = useData();
+    const { customers } = usePOS();
     const { user } = useAuth(); // Get user from AuthContext
     const storeId = user?.storeId; // Simple storeId retrieval for Store Admin
 

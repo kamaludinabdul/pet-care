@@ -8,10 +8,10 @@ import { Calendar, ShoppingBag, CreditCard } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { useData } from '../context/DataContext';
+import { usePOS } from '../context/POSContext';
 
 const CustomerTransactionHistory = ({ isOpen, onClose, customer }) => {
-    const { processDebtPayment } = useData();
+    const { processDebtPayment } = usePOS();
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [stats, setStats] = useState({

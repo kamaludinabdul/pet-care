@@ -19,6 +19,12 @@ export const firebaseConfig = {
 console.log('Firebase Project ID:', firebaseConfig.projectId);
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore (without persistence to avoid multi-tab issues)
-export const db = getFirestore(app);
+// Initialize Firestore with offline persistence
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+    })
+});
 export const auth = getAuth(app);

@@ -1,363 +1,370 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../firebase';
-import { collection, addDoc, doc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
+import { useNavigate, useParams } from 'react-router-dom';
+import { usePOS } from '../../context/POSContext';
+import { useStores } from '../../context/StoresContext';
 import { useAuth } from '../../context/AuthContext';
-import { useData } from '../../context/DataContext';
+import { db } from '../../firebase';
+import { collection, addDoc, doc, updateDoc, getDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../components/ui/card';
+import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group';
 import { Textarea } from '../../components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { useNavigate, useParams } from 'react-router-dom';
+import { CalendarIcon, ArrowLeft } from 'lucide-react';
+import { sendBookingNotification } from '../../services/telegram';
 
 const BookingForm = () => {
     const { id } = useParams();
+    const isEdit = !!id;
     const navigate = useNavigate();
     const { user } = useAuth();
-    // We need customers to find pets, OR just fetch all pets.
-    // Let's fetch pets directly.
+    const { currentStore } = useStores();
+    const { customers } = usePOS();
 
+
+    // Local State
     const [loading, setLoading] = useState(false);
-    const [pets, setPets] = useState([]);
+    const [selectedCustomer, setSelectedCustomer] = useState('');
+    const [customerPets, setCustomerPets] = useState([]);
+    const [selectedPet, setSelectedPet] = useState('');
+    const [serviceType, setServiceType] = useState('grooming');
+    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startTime, setStartTime] = useState('09:00');
+    const [endDate, setEndDate] = useState('');
+    const [notes, setNotes] = useState('');
     const [rooms, setRooms] = useState([]);
-    const [services, setServices] = useState([]); // [NEW] Services List
+    const [selectedRoom, setSelectedRoom] = useState('');
+    const [groomingServices, setGroomingServices] = useState([]);
+    const [selectedServiceId, setSelectedServiceId] = useState('');
+
+    // Anamnesis State
+    const [anamnesis, setAnamnesis] = useState([]);
+
+    const SYMPTOMS = [
+        'Muntah', 'Diare', 'Tidak Mau Makan', 'Lemas', 'Batuk', 'Pilek', 'Gatal / Masalah Kulit', 'Lainnya'
+    ];
 
     const storeId = user?.storeId;
 
-    const [formData, setFormData] = useState({
-        serviceType: 'grooming', // grooming, hotel
-        petId: '',
-        ownerId: '',
-        roomId: '', // For hotel
-        serviceId: '', // [NEW] For grooming/clinic
-        startDate: new Date().toISOString().split('T')[0],
-        startTime: '10:00',
-        endDate: '', // For hotel
-        notes: '',
-        status: 'pending'
-    });
-
+    // Fetch rooms if hotel
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchRooms = async () => {
             if (!storeId) return;
-
-            // Fetch Pets
-            const petsQ = query(collection(db, 'pets'), where('storeId', '==', storeId));
-            const petsSnap = await getDocs(petsQ);
-            setPets(petsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-            // Fetch Rooms
-            const roomsQ = query(collection(db, 'rooms'), where('storeId', '==', storeId));
-            const roomsSnap = await getDocs(roomsQ);
-            setRooms(roomsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-            // [NEW] Fetch Services
-            const servicesQ = query(
-                collection(db, 'products'),
-                where('storeId', '==', storeId),
-                where('isPetService', '==', true)
-            );
-            const servicesSnap = await getDocs(servicesQ);
-            setServices(servicesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            const q = query(collection(db, 'rooms'), where('storeId', '==', storeId));
+            const snap = await getDocs(q);
+            setRooms(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         };
-        fetchData();
+        fetchRooms();
     }, [storeId]);
 
+    // Fetch Grooming Services
     useEffect(() => {
-        if (id) {
-            const fetchBooking = async () => {
+        const fetchServices = async () => {
+            if (!storeId) return;
+            try {
+                const q = query(collection(db, 'services'), where('storeId', '==', storeId), where('category', '==', 'grooming'));
+                const snap = await getDocs(q);
+                setGroomingServices(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (err) {
+                console.error("BookingForm.jsx: Error fetching services:", err);
+            }
+        };
+        fetchServices();
+    }, [storeId]);
+
+
+    // Fetch Booking if Edit
+    useEffect(() => {
+        const fetchBooking = async () => {
+            if (isEdit && id) {
                 setLoading(true);
                 try {
-                    const docSnap = await getDoc(doc(db, 'bookings', id));
+                    const docRef = doc(db, 'bookings', id);
+                    const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {
-                        setFormData({ ...docSnap.data() });
+                        const data = docSnap.data();
+                        setSelectedCustomer(data.ownerId);
+                        setSelectedPet(data.petId);
+                        setServiceType(data.serviceType);
+                        setStartDate(data.startDate);
+                        setStartTime(data.startTime);
+                        setEndDate(data.endDate || '');
+                        setNotes(data.notes || '');
+                        setSelectedRoom(data.roomId || '');
+                        setSelectedRoom(data.roomId || '');
+                        setSelectedServiceId(data.serviceId || '');
+                        setAnamnesis(data.anamnesis || []);
                     }
                 } catch (error) {
                     console.error("Error fetching booking:", error);
                 } finally {
                     setLoading(false);
                 }
-            };
-            fetchBooking();
-        }
-    }, [id]);
+            }
+        };
+        fetchBooking();
+    }, [isEdit, id]);
 
-    const handlePetChange = (petId) => {
-        const selectedPet = pets.find(p => p.id === petId);
-        setFormData({
-            ...formData,
-            petId: petId,
-            ownerId: selectedPet ? selectedPet.ownerId : ''
-        });
-    };
-
-    // [NEW] Handle Service Change
-    const handleServiceChange = (serviceId) => {
-        // You might want to auto-fill price or notes based on service
-        setFormData({ ...formData, serviceId: serviceId });
-    };
+    // Fetch Pets when Customer Selects
+    useEffect(() => {
+        const fetchPets = async () => {
+            if (selectedCustomer) {
+                const q = query(collection(db, 'pets'), where('ownerId', '==', selectedCustomer));
+                const snap = await getDocs(q);
+                setCustomerPets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } else {
+                setCustomerPets([]);
+            }
+        };
+        fetchPets();
+    }, [selectedCustomer]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!storeId) return;
-
-        if (!formData.petId) {
-            alert("Mohon pilih hewan terlebih dahulu.");
-            return;
-        }
-
-        if (formData.serviceType === 'hotel' && !formData.roomId) {
-            alert("Mohon pilih kamar untuk layanan hotel.");
-            return;
-        }
-
-        // [NEW] Validate service selection for non-hotel types
-        if (formData.serviceType !== 'hotel' && !formData.serviceId) {
-            alert("Mohon pilih jenis layanan.");
-            return;
-        }
-
         setLoading(true);
+
+        if (!selectedCustomer || !selectedPet) {
+            alert("Mohon pilih Pelanggan dan Hewan Peliharaan terlebih dahulu.");
+            setLoading(false);
+            return;
+        }
+
+        if (serviceType === 'grooming' && !selectedServiceId) {
+            alert("Mohon pilih Layanan Grooming.");
+            setLoading(false);
+            return;
+        }
+
         try {
-            // Check for Double Booking if Hotel
-            if (formData.serviceType === 'hotel') {
-                const bookingsRef = collection(db, 'bookings');
-                // Query broadly for the room, then filter locally for date overlap to avoid complex indexes for now
-                // Or use multiple queries. 
-                // Simple Overlap Logic: (StartA <= EndB) and (EndA >= StartB)
+            const customer = customers.find(c => c.id === selectedCustomer);
+            const pet = customerPets.find(p => p.id === selectedPet);
+            const room = rooms.find(r => r.id === selectedRoom);
+            const service = groomingServices.find(s => s.id === selectedServiceId);
 
-                const q = query(
-                    bookingsRef,
-                    where('storeId', '==', storeId),
-                    where('roomId', '==', formData.roomId),
-                    where('status', 'in', ['confirmed', 'checked_in', 'pending']) // Don't check cancelled/completed? Maybe completed counts if user extends? usually completed means done.
-                );
+            // Calculate Price
+            let unitPrice = 0;
+            let totalPrice = 0;
 
-                const snapshot = await getDocs(q);
-                const hasOverlap = snapshot.docs.some(doc => {
-                    if (doc.id === id) return false; // Ignore self if editing
-                    const b = doc.data();
-                    const newStart = formData.startDate;
-                    const newEnd = formData.endDate;
-                    const existingStart = b.startDate;
-                    const existingEnd = b.endDate || b.startDate; // Fallback if single day
-
-                    return (newStart <= existingEnd && newEnd >= existingStart);
-                });
-
-                if (hasOverlap) {
-                    alert("Kamar ini sudah terisi pada tanggal yang dipilih. Mohon pilih kamar lain atau tanggal berbeda.");
-                    setLoading(false);
-                    return;
+            if (serviceType === 'hotel' && room) {
+                unitPrice = Number(room.price) || 0;
+                if (startDate && endDate) {
+                    const start = new Date(startDate);
+                    const end = new Date(endDate);
+                    const diffTime = Math.abs(end - start);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; // Minimum 1 night
+                    totalPrice = unitPrice * diffDays;
+                } else {
+                    totalPrice = unitPrice;
                 }
+            } else if (serviceType === 'grooming' && service) {
+                unitPrice = Number(service.price) || 0;
+                totalPrice = unitPrice;
             }
 
-            // Find selected room name if any
-            const selectedRoom = rooms.find(r => r.id === formData.roomId);
-            // [NEW] Find selected service name if any
-            const selectedService = services.find(s => s.id === formData.serviceId);
-
-            const dataToSave = {
-                ...formData,
-                roomName: selectedRoom ? selectedRoom.name : '', // Cache room name
-                serviceName: selectedService ? selectedService.name : '', // [NEW] Cache service name
-                servicePrice: selectedService ? selectedService.price : 0, // [NEW] Cache price
+            const bookingData = {
                 storeId,
-                updatedAt: new Date().toISOString()
+                ownerId: selectedCustomer,
+                ownerName: customer?.name || 'Unknown',
+                petId: selectedPet,
+                petName: pet?.name || 'Unknown',
+                petType: pet?.type || 'Dog',
+                serviceType,
+                startDate,
+                startTime,
+                endDate: serviceType === 'hotel' ? endDate : null,
+                roomId: serviceType === 'hotel' ? selectedRoom : null,
+                roomName: serviceType === 'hotel' ? room?.name : null,
+                serviceId: serviceType === 'grooming' ? selectedServiceId : null,
+                serviceName: serviceType === 'grooming' ? service?.name : null,
+                unitPrice, // Save Unit Price
+                totalPrice, // Save Total Price
+                notes,
+                anamnesis: serviceType === 'clinic' ? anamnesis : [], // Save Anamnesis
+                status: isEdit ? undefined : (serviceType === 'grooming' ? 'pending' : 'confirmed'),
+                updatedAt: serverTimestamp(),
             };
 
-            if (id) {
-                await updateDoc(doc(db, 'bookings', id), dataToSave);
+            if (!isEdit) {
+                bookingData.createdAt = serverTimestamp();
+                const docRef = await addDoc(collection(db, 'bookings'), bookingData);
+
+                // Update Room Status if Hotel
+                if (serviceType === 'hotel' && selectedRoom) {
+                    await updateDoc(doc(db, 'rooms', selectedRoom), { status: 'occupied', currentOccupantId: docRef.id });
+                }
+
+                // Send Telegram Notification
+                await sendBookingNotification(
+                    { id: docRef.id, ...bookingData },
+                    currentStore,
+                    customer,
+                    pet
+                );
+
             } else {
-                await addDoc(collection(db, 'bookings'), {
-                    ...dataToSave,
-                    createdAt: new Date().toISOString()
-                });
+                await updateDoc(doc(db, 'bookings', id), bookingData);
             }
+
             navigate('/pet-care/bookings');
         } catch (error) {
             console.error("Error saving booking:", error);
+            alert("Gagal menyimpan booking.");
         } finally {
             setLoading(false);
         }
     };
 
-    // Filter services based on type (simple mapping for now)
-    const filteredServices = services.filter(s => {
-        if (formData.serviceType === 'grooming') return s.category === 'Grooming';
-        if (formData.serviceType === 'clinic') return s.category === 'Klinik';
-        return true; // Show all for others or default
-    });
-
     return (
-        <div className="p-4 max-w-2xl mx-auto">
-            <Card className="border-indigo-100 shadow-lg">
-                <CardHeader className="bg-indigo-50/50 border-b border-indigo-100 pb-4">
-                    <CardTitle className="text-xl font-bold text-indigo-950">{id ? 'Edit Reservasi' : 'Buat Reservasi Baru'}</CardTitle>
+        <div className="max-w-2xl mx-auto p-4">
+            <Button variant="ghost" className="mb-4" onClick={() => navigate('/pet-care/bookings')}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Kembali
+            </Button>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{isEdit ? 'Edit Reservasi' : 'Buat Reservasi Baru'}</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-6">
-                    <form onSubmit={handleSubmit} className="space-y-6">
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Tipe Layanan</Label>
-                                <Select
-                                    value={formData.serviceType}
-                                    onValueChange={(val) => setFormData({ ...formData, serviceType: val, serviceId: '' })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="grooming">Grooming / Salon</SelectItem>
-                                        <SelectItem value="hotel">Hotel / Penitipan</SelectItem>
-                                        <SelectItem value="clinic">Klinik / Dokter</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Status</Label>
-                                <Select
-                                    value={formData.status}
-                                    onValueChange={(val) => setFormData({ ...formData, status: val })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="pending">Menunggu (Pending)</SelectItem>
-                                        <SelectItem value="confirmed">Konfirmasi</SelectItem>
-                                        <SelectItem value="checked_in">Check-In</SelectItem>
-                                        <SelectItem value="checked_out">Selesai / Check-Out</SelectItem>
-                                        <SelectItem value="cancelled">Dibatalkan</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
+                <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-4">
 
                         <div className="space-y-2">
-                            <Label>Pilih Hewan <span className="text-red-500">*</span></Label>
-                            <Select
-                                value={formData.petId}
-                                onValueChange={handlePetChange}
-                                disabled={pets.length === 0}
-                            >
+                            <Label>Pelanggan</Label>
+                            <Select value={selectedCustomer} onValueChange={setSelectedCustomer} disabled={isEdit}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Pilih hewan..." />
+                                    <SelectValue placeholder="Pilih Pelanggan" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {pets.map(pet => (
-                                        <SelectItem key={pet.id} value={pet.id}>
-                                            {pet.name} ({pet.type})
-                                        </SelectItem>
+                                    {customers.map(c => (
+                                        <SelectItem key={c.id} value={c.id}>{c.name} - {c.phone}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {pets.length === 0 && (
-                                <p className="text-xs text-muted-foreground">Belum ada hewan. Silakan daftarkan hewan terlebih dahulu.</p>
-                            )}
                         </div>
 
-                        {/* [NEW] Service Selection for Grooming/Clinic */}
-                        {formData.serviceType !== 'hotel' && (
-                            <div className="space-y-2">
-                                <Label>Pilih Paket / Layanan <span className="text-red-500">*</span></Label>
-                                <Select
-                                    value={formData.serviceId}
-                                    onValueChange={handleServiceChange}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Pilih layanan..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {filteredServices.map(service => (
-                                            <SelectItem key={service.id} value={service.id}>
-                                                {service.name} - Rp {service.price.toLocaleString()}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {filteredServices.length === 0 && (
-                                    <p className="text-xs text-red-500">Belum ada layanan untuk kategori ini. Tambahkan di menu 'Layanan & Harga'.</p>
-                                )}
+                        <div className="space-y-2">
+                            <Label>Hewan Peliharaan</Label>
+                            <Select value={selectedPet} onValueChange={setSelectedPet} disabled={!selectedCustomer}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Pilih Hewan" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {customerPets.map(p => (
+                                        <SelectItem key={p.id} value={p.id}>{p.name} ({p.type})</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Jenis Layanan</Label>
+                            <RadioGroup value={serviceType} onValueChange={setServiceType} className="flex gap-4">
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="grooming" id="grooming" />
+                                    <Label htmlFor="grooming">Grooming</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="hotel" id="hotel" />
+                                    <Label htmlFor="hotel">Pet Hotel</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="clinic" id="clinic" />
+                                    <Label htmlFor="clinic">Klinik / Dokter</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+
+                        {serviceType === 'clinic' && (
+                            <div className="space-y-3 p-4 bg-red-50 border border-red-100 rounded-lg">
+                                <Label className="text-red-800 font-semibold">Anamnesa / Keluhan Awal</Label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {SYMPTOMS.map(symptom => (
+                                        <div key={symptom} className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                id={`sym-${symptom}`}
+                                                className="rounded border-red-300 text-red-600 focus:ring-red-500"
+                                                checked={anamnesis.includes(symptom)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setAnamnesis(prev => [...prev, symptom]);
+                                                    } else {
+                                                        setAnamnesis(prev => prev.filter(s => s !== symptom));
+                                                    }
+                                                }}
+                                            />
+                                            <Label htmlFor={`sym-${symptom}`} className="cursor-pointer text-slate-700 font-normal">
+                                                {symptom}
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
 
-                        {formData.serviceType === 'hotel' && (
+                        {serviceType === 'grooming' && (
                             <div className="space-y-2">
-                                <Label>Pilih Kamar <span className="text-red-500">*</span></Label>
-                                <Select
-                                    value={formData.roomId}
-                                    onValueChange={(val) => setFormData({ ...formData, roomId: val })}
-                                >
+                                <Label>Pilih Layanan Grooming <span className="text-red-500">*</span></Label>
+                                <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Pilih kamar..." />
+                                        <SelectValue placeholder="Pilih Layanan..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {rooms.map(room => (
-                                            <SelectItem key={room.id} value={room.id}>
-                                                {room.name} ({room.type} - Rp {room.price?.toLocaleString()})
+                                        {groomingServices.map(s => (
+                                            <SelectItem key={s.id} value={s.id}>
+                                                {s.name} - Rp {s.price.toLocaleString()}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {rooms.length === 0 && (
-                                    <p className="text-xs text-red-500">Belum ada kamar dibuat. Mohon buat kamar di menu Kamar Hotel.</p>
-                                )}
                             </div>
                         )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Tanggal {formData.serviceType === 'hotel' ? 'Masuk' : 'Booking'}</Label>
-                                <Input
-                                    type="date"
-                                    value={formData.startDate}
-                                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                                    required
-                                />
+                                <Label>Tanggal Mulai</Label>
+                                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
                             </div>
                             <div className="space-y-2">
-                                <Label>Jam</Label>
-                                <Input
-                                    type="time"
-                                    value={formData.startTime}
-                                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                                />
+                                <Label>Waktu</Label>
+                                <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} required />
                             </div>
                         </div>
 
-                        {formData.serviceType === 'hotel' && (
-                            <div className="space-y-2">
-                                <Label>Tanggal Keluar (Check-Out)</Label>
-                                <Input
-                                    type="date"
-                                    value={formData.endDate}
-                                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                                    required={formData.serviceType === 'hotel'}
-                                />
-                            </div>
+                        {serviceType === 'hotel' && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label>Tanggal Selesai (Check-out)</Label>
+                                    <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Pilih Kandang / Ruangan</Label>
+                                    <Select value={selectedRoom} onValueChange={setSelectedRoom}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Pilih Ruangan" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {rooms.filter(r => r.status === 'available' || r.id === selectedRoom).map(r => (
+                                                <SelectItem key={r.id} value={r.id}>
+                                                    {r.name} ({r.type}) - Rp {r.price.toLocaleString()}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </>
                         )}
 
                         <div className="space-y-2">
-                            <Label>Catatan Tambahan</Label>
-                            <Textarea
-                                value={formData.notes}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                placeholder="Contoh: Request model potongan, bawa makanan sendiri, dll."
-                            />
+                            <Label>Catatan</Label>
+                            <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Catatan khusus..." />
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4">
-                            <Button type="button" variant="outline" onClick={() => navigate('/pet-care/bookings')}>
-                                Batal
-                            </Button>
-                            <Button type="submit" disabled={loading}>
-                                {loading ? 'Menyimpan...' : 'Simpan Reservasi'}
-                            </Button>
-                        </div>
+                        <Button type="submit" className="w-full" disabled={loading}>
+                            {loading ? 'Menyimpan...' : (isEdit ? 'Simpan Perubahan' : 'Buat Reservasi')}
+                        </Button>
                     </form>
                 </CardContent>
             </Card>

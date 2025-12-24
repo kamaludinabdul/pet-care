@@ -4,14 +4,14 @@ import { collection, addDoc, query, where, updateDoc, doc, onSnapshot } from 'fi
 
 import { sendMessage } from '../services/telegram';
 import { useAuth } from './AuthContext';
-import { useData } from './DataContext';
+import { useStores } from './StoresContext';
 
 const ShiftContext = createContext(null);
 
 export const ShiftProvider = ({ children }) => {
     const [currentShift, setCurrentShift] = useState(null);
     const [loading, setLoading] = useState(true);
-    const { currentStore } = useData();
+    const { currentStore } = useStores();
     const { user } = useAuth();
 
     useEffect(() => {
