@@ -32,6 +32,8 @@ const Reports = React.lazy(() => import('./pages/pet-care/Reports'));
 const DailyLog = React.lazy(() => import('./pages/pet-care/DailyLog'));
 const CashFlow = React.lazy(() => import('./pages/pet-care/CashFlow'));
 const Settings = React.lazy(() => import('./pages/Settings'));
+const RoleList = React.lazy(() => import('./pages/settings/RoleList'));
+const RoleForm = React.lazy(() => import('./pages/settings/RoleForm'));
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-slate-50">
@@ -103,6 +105,9 @@ function App() {
 
                   {/* Settings */}
                   <Route path="settings" element={<Settings />} />
+                  <Route path="settings/roles" element={<RoleList />} />
+                  <Route path="settings/roles/add" element={<RoleForm />} />
+                  <Route path="settings/roles/:id" element={<RoleForm />} />
                 </Route>
 
                 {/* Catch all */}

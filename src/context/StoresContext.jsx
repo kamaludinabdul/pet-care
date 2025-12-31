@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+/* eslint-disable react-refresh/only-export-components */
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, getDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { normalizePermissions } from '../utils/permissions';
 import { checkPlanLimit } from '../utils/planLimits';
 import { initializeApp, deleteApp } from "firebase/app";
-import { getAuth as getAuthSecondary, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { getAuth as getAuthSecondary, createUserWithEmailAndPassword } from "firebase/auth";
 import { firebaseConfig } from '../firebase';
 
 const StoresContext = createContext(null);

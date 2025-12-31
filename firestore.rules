@@ -57,5 +57,9 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if isAuthenticated();
     }
+    
+    match /roles/{roleId} {
+        allow read, write: if isAuthenticated();
+    }
   }
 }

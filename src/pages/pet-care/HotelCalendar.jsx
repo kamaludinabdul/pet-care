@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent } from '../../components/ui/card';
 
-const HotelCalendar = ({ bookings, getPetName }) => {
+const HotelCalendar = ({ bookings }) => {
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -86,11 +86,11 @@ const HotelCalendar = ({ bookings, getPetName }) => {
                             <div
                                 key={day.toString()}
                                 className={`min-h-[120px] border-b border-r border-slate-100 p-1 transition-colors hover:bg-slate-50 ${!isSameMonth(day, monthStart) ? 'bg-slate-50/50 text-slate-400' : 'bg-white'
-                                    }`}
+                                    } `}
                             >
                                 <div className="flex justify-between items-start mb-1 px-1">
                                     <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-slate-700'
-                                        }`}>
+                                        } `}>
                                         {format(day, dateFormat)}
                                     </span>
                                 </div>
@@ -106,7 +106,7 @@ const HotelCalendar = ({ bookings, getPetName }) => {
                                                 className={`text-[10px] px-1.5 py-1 rounded border truncate flex flex-col leading-tight ${booking.status === 'checked_in'
                                                     ? 'bg-green-50 text-green-700 border-green-200'
                                                     : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                                    }`}
+                                                    } `}
                                                 title={`${roomName} - ${booking.petName} (${booking.customer?.name})`}
                                             >
                                                 <span className="font-bold">{roomName}</span>

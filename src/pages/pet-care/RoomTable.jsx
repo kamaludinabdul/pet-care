@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Search, Filter, Edit, Trash2 } from 'lucide-react';
 
-const RoomTable = ({ rooms, bookings, onEdit, onDelete, onStatusChange }) => {
+const RoomTable = ({ rooms, bookings, onEdit, onDelete }) => {
     const [filterStatus, setFilterStatus] = useState('all'); // all, available, occupied
     const [searchTerm, setSearchTerm] = useState('');
 

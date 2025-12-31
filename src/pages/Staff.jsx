@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit2, Trash2, Shield, User, Circle, History, Eye, EyeOff } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, updateDoc, deleteDoc, doc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
-import { AVAILABLE_PERMISSIONS, normalizePermissions } from '../utils/permissions';
+import { AVAILABLE_PERMISSIONS } from '../utils/permissions';
 import { useStores } from '../context/StoresContext';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';

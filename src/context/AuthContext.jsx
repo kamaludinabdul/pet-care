@@ -60,6 +60,20 @@ export const AuthProvider = ({ children }) => {
                             }
                         }
 
+                        // 3. Fetch Role Permissions if roleId exists
+                        if (userData.roleId) {
+                            try {
+                                const roleDoc = await getDoc(doc(db, 'roles', userData.roleId));
+                                if (roleDoc.exists()) {
+                                    const roleData = roleDoc.data();
+                                    userData.permissions = { ...userData.permissions, ...roleData.permissions };
+                                    userData.roleName = roleData.name;
+                                }
+                            } catch (err) {
+                                console.error("Error fetching permissions for role:", err);
+                            }
+                        }
+
                         // Update status to online (Non-blocking)
                         updateDoc(userDocRef, {
                             status: 'online',

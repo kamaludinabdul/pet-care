@@ -46,23 +46,26 @@ export const getDateRange = (rangeKey, customStart, customEnd) => {
     let startDate, endDate;
 
     switch (rangeKey) {
-        case 'today':
+        case 'today': {
             startDate = startOfDay;
             endDate = new Date(now);
             break;
-        case 'yesterday':
+        }
+        case 'yesterday': {
             startDate = new Date(startOfDay);
             startDate.setDate(startDate.getDate() - 1);
             endDate = new Date(startOfDay);
             endDate.setMilliseconds(-1);
             break;
-        case 'last7days':
+        }
+        case 'last7days': {
             startDate = new Date(startOfDay);
             startDate.setDate(startDate.getDate() - 6); // 7 days ensuring today is included? Or today-7? Usually 7 days inclusive: Today + 6 past days
             endDate = new Date(now);
             break;
+        }
         case 'week':
-        case 'thisWeek':
+        case 'thisWeek': {
             // Monday to Sunday logic
             startDate = new Date(startOfDay);
             const day = startDate.getDay();
@@ -73,8 +76,9 @@ export const getDateRange = (rangeKey, customStart, customEnd) => {
             endDate.setDate(startDate.getDate() + 6);
             endDate.setHours(23, 59, 59, 999);
             break;
+        }
         case 'last_week':
-        case 'lastWeek':
+        case 'lastWeek': {
             // Previous Monday to Previous Sunday
             startDate = new Date(startOfDay);
             const currentDay = startDate.getDay();
@@ -85,6 +89,7 @@ export const getDateRange = (rangeKey, customStart, customEnd) => {
             endDate.setDate(startDate.getDate() + 6);
             endDate.setHours(23, 59, 59, 999);
             break;
+        }
         case 'month':
         case 'thisMonth':
             startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -135,7 +140,7 @@ export const formatPaymentMethod = (method) => {
     }
 };
 
-import { differenceInYears, differenceInMonths, differenceInDays } from 'date-fns';
+import { differenceInYears, differenceInMonths } from 'date-fns';
 
 export function calculateAge(birthDate) {
     if (!birthDate) return null;

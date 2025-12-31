@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -21,28 +21,28 @@ const ActivityLogModal = ({ booking, isOpen, onClose }) => {
         notes: ''
     });
 
-    useEffect(() => {
-        if (isOpen && booking?.id) {
-            fetchLogs();
-        }
-    }, [isOpen, booking]);
-
-    const fetchLogs = async () => {
+    const fetchLogs = useCallback(async () => {
         setLoading(true);
         try {
             const q = query(
-                collection(db, 'daily_logs'),
+                collection(db, 'activity_logs'),
                 where('bookingId', '==', booking.id),
-                orderBy('createdAt', 'desc')
+                orderBy('timestamp', 'desc')
             );
-            const snap = await getDocs(q);
-            setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            const snapshot = await getDocs(q);
+            setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         } catch (error) {
-            console.error("Error fetching logs:", error);
+            console.error("Error fetching activity logs:", error);
         } finally {
             setLoading(false);
         }
-    };
+    }, [booking?.id]);
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchLogs();
+        }
+    }, [isOpen, fetchLogs, booking]);
 
     const handleSave = async () => {
         try {

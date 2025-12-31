@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Plus, Trash2, Calculator, Loader2, Printer, CheckCircle } from 'lucide-react';
-import { format, differenceInCalendarDays, eachDayOfInterval, isSaturday, isSunday } from 'date-fns';
+import { format, differenceInCalendarDays, isSaturday, isSunday } from 'date-fns';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, doc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
@@ -16,7 +16,6 @@ const PetPaymentModal = ({ isOpen, onClose, booking, medicalRecord, onSuccess })
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState('input'); // 'input' | 'success'
-    const [transactionId, setTransactionId] = useState(null);
     const [savedTransaction, setSavedTransaction] = useState(null);
     const [staffList, setStaffList] = useState([]);
 
@@ -52,9 +51,7 @@ const PetPaymentModal = ({ isOpen, onClose, booking, medicalRecord, onSuccess })
             try {
                 const start = new Date(booking.startDate);
                 const end = new Date(booking.endDate);
-                // Fix: ensure valid interval. If start > end, just use start.
                 if (start <= end) {
-                    const days = eachDayOfInterval({ start, end: new Date(end.setDate(end.getDate() - 1)) }); // Exclude checkout day for night count usually? Or include?
                     // "5000/hari/hewan". Usually per night. Let's assume inclusive of start, exclusive of end (nights).
                     // If start=1, end=2, that's 1 night.
                     // Implementation: differenceInCalendarDays is nights.
@@ -159,10 +156,9 @@ const PetPaymentModal = ({ isOpen, onClose, booking, medicalRecord, onSuccess })
 
             setItems(initialItems);
             setStep('input');
-            setTransactionId(null);
             setSavedTransaction(null);
         }
-    }, [isOpen, booking, medicalRecord]);
+    }, [isOpen, booking, medicalRecord, user]);
 
     const handleAddItem = () => {
         setItems([...items, { name: '', price: 0, qty: 1, type: 'manual', id: Date.now() }]);
@@ -267,7 +263,6 @@ const PetPaymentModal = ({ isOpen, onClose, booking, medicalRecord, onSuccess })
             }
 
             const docRef = await addDoc(collection(db, 'transactions'), transactionData);
-            setTransactionId(docRef.id);
             setSavedTransaction({ id: docRef.id, ...transactionData });
 
             // 2. Update Source Document Status

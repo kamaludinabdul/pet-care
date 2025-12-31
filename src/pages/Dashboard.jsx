@@ -1,7 +1,6 @@
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { useStores } from '../context/StoresContext';
 import PetCareWidget from './pet-care/PetCareWidget';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
@@ -13,7 +12,7 @@ import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from
 import { id } from 'date-fns/locale';
 
 const Dashboard = () => {
-    const { user } = useAuth();
+    // const { user } = useAuth();
     const navigate = useNavigate();
     const { activeStoreId } = useStores();
     const [stats, setStats] = useState({

@@ -24,7 +24,8 @@ import {
     Database,
     Wallet,
     Stethoscope,
-    Scissors
+    Scissors,
+    Shield
 } from 'lucide-react';
 import { Button } from './ui/button';
 
@@ -106,7 +107,21 @@ const Layout = () => {
             ]
         }] : []),
 
-        { path: '/settings', label: 'Pengaturan', icon: Settings }
+        // Settings Group
+        {
+            label: 'Pengaturan',
+            icon: Settings,
+            isCollapsible: true,
+            isOpen: true, // Always open for now or manage state
+            toggle: () => { }, // No toggle needed if always open, or reuse state
+            children: [
+                { path: '/settings', label: 'Umum', icon: Settings },
+                // Role Management - Check Permission
+                ...((user?.role === 'admin' || user?.role === 'super_admin' || user?.permissions?.manage_roles) ? [
+                    { path: '/settings/roles', label: 'Hak Akses (Roles)', icon: Shield }
+                ] : [])
+            ]
+        }
     ];
 
     return (

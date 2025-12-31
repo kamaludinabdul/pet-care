@@ -9,7 +9,6 @@ import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { id } from 'date-fns/locale';
 import { Printer, Download, Filter, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Badge } from '../../components/ui/badge';
@@ -27,112 +26,115 @@ const FeeReport = () => {
     });
     const [selectedRole, setSelectedRole] = useState('all');
 
-    const fetchStaff = async () => {
-        if (!user?.storeId) return;
-        try {
-            const q = query(collection(db, 'users'), where('storeId', '==', user.storeId));
-            const snap = await getDocs(q);
-            setStaffList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (err) {
-            console.error("Error fetching staff", err);
-        }
-    };
+    // fetchStaff moved to useEffect
 
-    const fetchFees = async () => {
-        if (!user?.storeId || !dateRange?.from || !dateRange?.to) return;
-        try {
-            // Ensure end date covers the full day
-            const endDate = new Date(dateRange.to);
-            endDate.setHours(23, 59, 59, 999);
-
-            const q = query(
-                collection(db, 'transactions'),
-                where('storeId', '==', user.storeId),
-                where('date', '>=', dateRange.from.toISOString()),
-                where('date', '<=', endDate.toISOString())
-            );
-
-            const snap = await getDocs(q);
-            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-            // Process Items to find Fees
-            let processed = [];
-
-            docs.forEach(trx => {
-                if (trx.items && Array.isArray(trx.items)) {
-                    trx.items.forEach(item => {
-                        // 0. New Granular Commission Logic (Hotel)
-                        if (item.commissionDetails && Array.isArray(item.commissionDetails) && item.commissionDetails.length > 0) {
-                            item.commissionDetails.forEach(comm => {
-                                const staff = staffList.find(s => s.id === comm.staffId);
-                                processed.push({
-                                    trxId: trx.id,
-                                    trxDate: comm.date ? new Date(comm.date).toISOString() : trx.date, // Use specific date if available
-                                    trxNumber: (trx.id || '').slice(0, 8).toUpperCase(),
-                                    itemName: `${item.name} (${format(new Date(comm.date), 'dd MMM')})`,
-                                    staffId: comm.staffId,
-                                    staffName: staff ? (staff.name || staff.email) : 'Unknown',
-                                    staffRole: staff ? (staff.role || 'staff') : 'unknown',
-                                    fee: Number(comm.fee),
-                                    discount: 0, // Discount usually on total price, not fee
-                                    netFee: Number(comm.fee)
-                                });
-                            });
-                            // Skip standard logic below for this item if detailed commissions exist
-                            return;
-                        }
-
-                        // 1. Regular Staff Fee
-                        if (item.fee && item.fee > 0) {
-                            const staff = staffList.find(s => s.id === item.staffId);
-                            processed.push({
-                                trxId: trx.id,
-                                trxDate: trx.date, // Use the specific date for hotel items
-                                trxNumber: (trx.id || '').slice(0, 8).toUpperCase(),
-                                itemName: item.name,
-                                staffId: item.staffId,
-                                staffName: staff ? (staff.name || staff.email) : (item.staffName || 'Unassigned Staff'),
-                                staffRole: staff ? (staff.role || 'staff') : 'unknown',
-                                fee: Number(item.fee),
-                                discount: Number(item.discount || 0),
-                                netFee: Number(item.fee) - Number(item.discount || 0)
-                            });
-                        }
-
-                        // 2. Paramedic Fee (if any)
-                        if ((item.feeParamedic && item.feeParamedic > 0)) {
-                            const paramedic = staffList.find(s => s.id === item.paramedicId);
-                            processed.push({
-                                trxId: trx.id,
-                                trxDate: trx.date,
-                                trxNumber: (trx.id || '').slice(0, 8).toUpperCase(),
-                                itemName: `${item.name} (Paramedis)`,
-                                staffId: item.paramedicId,
-                                staffName: paramedic ? (paramedic.name || paramedic.email) : 'Unknown Paramedis',
-                                staffRole: 'paramedis', // Force role or use user role
-                                fee: Number(item.feeParamedic),
-                                discount: 0, // Discount usually applied to main price/doctor. Assumption: Paramedic gets full fee.
-                                netFee: Number(item.feeParamedic)
-                            });
-                        }
-                    });
-                }
-            });
-
-            // Client-side Sort
-            processed.sort((a, b) => new Date(b.trxDate) - new Date(a.trxDate));
-            setTransactions(processed);
-
-        } catch (error) {
-            console.error("Error fetching fees:", error);
-        }
-    };
+    // fetchFees moved to useEffect
 
     useEffect(() => {
+        const fetchStaff = async () => {
+            if (!user?.storeId) return;
+            try {
+                const q = query(collection(db, 'users'), where('storeId', '==', user.storeId));
+                const snap = await getDocs(q);
+                setStaffList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (err) {
+                console.error("Error fetching staff", err);
+            }
+        };
         fetchStaff();
     }, [user?.storeId]);
 
     useEffect(() => {
+        const fetchFees = async () => {
+            if (!user?.storeId || !dateRange?.from || !dateRange?.to) return;
+            try {
+                // Ensure end date covers the full day
+                const endDate = new Date(dateRange.to);
+                endDate.setHours(23, 59, 59, 999);
+
+                const q = query(
+                    collection(db, 'transactions'),
+                    where('storeId', '==', user.storeId),
+                    where('date', '>=', dateRange.from.toISOString()),
+                    where('date', '<=', endDate.toISOString())
+                );
+
+                const snap = await getDocs(q);
+                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // Process Items to find Fees
+                let processed = [];
+
+                docs.forEach(trx => {
+                    if (trx.items && Array.isArray(trx.items)) {
+                        trx.items.forEach(item => {
+                            // 0. New Granular Commission Logic (Hotel)
+                            if (item.commissionDetails && Array.isArray(item.commissionDetails) && item.commissionDetails.length > 0) {
+                                item.commissionDetails.forEach(comm => {
+                                    const staff = staffList.find(s => s.id === comm.staffId);
+                                    processed.push({
+                                        trxId: trx.id,
+                                        trxDate: comm.date ? new Date(comm.date).toISOString() : trx.date, // Use specific date if available
+                                        trxNumber: (trx.id || '').slice(0, 8).toUpperCase(),
+                                        itemName: `${item.name} (${format(new Date(comm.date), 'dd MMM')})`,
+                                        staffId: comm.staffId,
+                                        staffName: staff ? (staff.name || staff.email) : 'Unknown',
+                                        staffRole: staff ? (staff.role || 'staff') : 'unknown',
+                                        fee: Number(comm.fee),
+                                        discount: 0, // Discount usually on total price, not fee
+                                        netFee: Number(comm.fee)
+                                    });
+                                });
+                                // Skip standard logic below for this item if detailed commissions exist
+                                return;
+                            }
+
+                            // 1. Regular Staff Fee
+                            if (item.fee && item.fee > 0) {
+                                const staff = staffList.find(s => s.id === item.staffId);
+                                processed.push({
+                                    trxId: trx.id,
+                                    trxDate: trx.date, // Use the specific date for hotel items
+                                    trxNumber: (trx.id || '').slice(0, 8).toUpperCase(),
+                                    itemName: item.name,
+                                    staffId: item.staffId,
+                                    staffName: staff ? (staff.name || staff.email) : (item.staffName || 'Unassigned Staff'),
+                                    staffRole: staff ? (staff.role || 'staff') : 'unknown',
+                                    fee: Number(item.fee),
+                                    discount: Number(item.discount || 0),
+                                    netFee: Number(item.fee) - Number(item.discount || 0)
+                                });
+                            }
+
+                            // 2. Paramedic Fee (if any)
+                            if ((item.feeParamedic && item.feeParamedic > 0)) {
+                                const paramedic = staffList.find(s => s.id === item.paramedicId);
+                                processed.push({
+                                    trxId: trx.id,
+                                    trxDate: trx.date,
+                                    trxNumber: (trx.id || '').slice(0, 8).toUpperCase(),
+                                    itemName: `${item.name} (Paramedis)`,
+                                    staffId: item.paramedicId,
+                                    staffName: paramedic ? (paramedic.name || paramedic.email) : 'Unknown Paramedis',
+                                    staffRole: 'paramedis', // Force role or use user role
+                                    fee: Number(item.feeParamedic),
+                                    discount: 0, // Discount usually applied to main price/doctor. Assumption: Paramedic gets full fee.
+                                    netFee: Number(item.feeParamedic)
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // Client-side Sort
+                processed.sort((a, b) => new Date(b.trxDate) - new Date(a.trxDate));
+                setTransactions(processed);
+
+            } catch (error) {
+                console.error("Error fetching fees:", error);
+            }
+        };
+
         if (staffList.length > 0) {
             fetchFees();
         }

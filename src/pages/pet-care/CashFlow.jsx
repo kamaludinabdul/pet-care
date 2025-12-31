@@ -46,9 +46,9 @@ const CashFlow = () => {
 
     useEffect(() => {
         fetchData();
-    }, [user?.storeId, dateRange]);
+    }, [user?.storeId, dateRange, fetchData]);
 
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
         if (!user?.storeId || !dateRange?.from || !dateRange?.to) return;
         setLoading(true);
         try {
@@ -56,17 +56,10 @@ const CashFlow = () => {
             const endStr = format(dateRange.to, 'yyyy-MM-dd');
 
             // 1. Fetch Income (Transactions)
-            // Querying by date string assuming 'date' field is prioritized and is YYYY-MM-DD
-            // If fallback to createdAt is needed, this query might miss some if they lack 'date' field.
-            // For now, let's keep client-side filtering for transactions as legacy data might be mixed, 
-            // but add an ordering to limit fetching if possible or just accept it's "mostly" scalable for now.
-            // Actually, let's try to query by date range to be scalable as requested.
             const trxQ = query(
                 collection(db, 'transactions'),
                 where('storeId', '==', user.storeId),
                 where('type', '==', 'pet_service'),
-                // where('date', '>=', startStr), // Uncomment if indexes exist and data is consistent
-                // where('date', '<=', endStr)
             );
             const trxSnap = await getDocs(trxQ);
             const trxData = trxSnap.docs
@@ -80,7 +73,6 @@ const CashFlow = () => {
             setTransactions(trxData);
 
             // 2. Fetch Expenses - Optimized Server-Side
-            // We control this collection, so we ensure 'date' is YYYY-MM-DD string.
             const expQ = query(
                 collection(db, 'expenses'),
                 where('storeId', '==', user.storeId),
@@ -97,7 +89,7 @@ const CashFlow = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user?.storeId, dateRange]);
 
     const handleSaveExpense = async () => {
         if (!newExpense.description || !newExpense.amount) return;

@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Datepicker from "react-tailwindcss-datepicker";
-import { getDateRange } from '../lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Button } from './ui/button';
+import { Calendar } from './ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+/* eslint-disable react-hooks/exhaustive-deps */
 
 export function SmartDatePicker({
     date,
@@ -14,11 +18,15 @@ export function SmartDatePicker({
     });
 
     // Sync state when prop changes
+    // Initialize state from props
+    // Use key on component to force re-mount if needed, or use effect with check
     useEffect(() => {
-        setValue({
-            startDate: date?.from ? new Date(date.from) : null,
-            endDate: date?.to ? new Date(date.to) : (date?.from ? new Date(date.from) : null)
-        });
+        if (date?.from && date?.from !== value.startDate) {
+            setValue(prev => ({ ...prev, startDate: new Date(date.from) }));
+        }
+        if (date?.to && date?.to !== value.endDate) {
+            setValue(prev => ({ ...prev, endDate: new Date(date.to) }));
+        }
     }, [date]);
 
     const handleValueChange = (newValue) => {

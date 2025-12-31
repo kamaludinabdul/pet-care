@@ -25,12 +25,14 @@ const ProductHistoryDialog = ({ isOpen, onClose, product }) => {
 
     useEffect(() => {
         if (isOpen && product) {
-            setLoading(true);
-            // Filter movements for this product from the global context
-            // Since movements are already fetched and sorted in context, we just filter
-            const productMovements = stockMovements.filter(m => m.productId === product.id);
-            setHistory(productMovements);
-            setLoading(false);
+            const init = async () => {
+                setLoading(true);
+                // Filter movements for this product from the global context
+                const productMovements = stockMovements.filter(m => m.productId === product.id);
+                setHistory(productMovements);
+                setLoading(false);
+            };
+            init();
         }
     }, [isOpen, product, stockMovements]);
 

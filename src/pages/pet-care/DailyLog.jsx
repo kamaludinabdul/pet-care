@@ -19,9 +19,9 @@ const DailyLog = () => {
     useEffect(() => {
         if (!activeStoreId) return;
         fetchActiveGuests();
-    }, [activeStoreId]);
+    }, [activeStoreId, fetchActiveGuests]);
 
-    const fetchActiveGuests = async () => {
+    const fetchActiveGuests = React.useCallback(async () => {
         setLoading(true);
         try {
             // Fetch checked_in and confirmed bookings
@@ -41,7 +41,7 @@ const DailyLog = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeStoreId]);
 
     const filteredGuests = guests.filter(g =>
         (g.petName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||

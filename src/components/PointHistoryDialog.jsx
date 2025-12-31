@@ -11,23 +11,30 @@ const PointHistoryDialog = ({ open, onOpenChange, customer }) => {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (open && customer) {
+        const fetchHistory = async () => {
+            setLoading(true);
+            try {
+                const result = await getPointAdjustmentHistory(customer.id);
+                if (result.success) {
+                    setHistory(result.data);
+                } else {
+                    console.error('Failed to fetch history:', result.error);
+                    setHistory([]);
+                }
+            } catch (error) {
+                console.error("Error fetching history:", error);
+                setHistory([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (open && customer && customer.id) {
             fetchHistory();
         }
-    }, [open, customer]);
+    }, [open, customer, getPointAdjustmentHistory]);
 
-    const fetchHistory = async () => {
-        setLoading(true);
-        const result = await getPointAdjustmentHistory(customer.id);
-        setLoading(false);
 
-        if (result.success) {
-            setHistory(result.data);
-        } else {
-            console.error('Failed to fetch history:', result.error);
-            setHistory([]);
-        }
-    };
 
     const getTypeBadge = (type) => {
         switch (type) {

@@ -7,7 +7,7 @@ import { collection, getDocs, addDoc, setDoc, updateDoc, deleteDoc, doc, query, 
 
 import { useAuth } from './AuthContext';
 import { useStores } from './StoresContext';
-import { normalizePermissions } from '../utils/permissions';
+import { AVAILABLE_PERMISSIONS } from '../utils/permissions';
 import { checkPlanLimit, PLAN_LIMITS } from '../utils/planLimits';
 
 
@@ -765,14 +765,14 @@ export const POSProvider = ({ children }) => {
                 const productSnap = await getDoc(productRef);
 
                 if (!productSnap.exists()) {
-                    return { success: false, error: 'Produk \"' + item.name + '\" tidak ditemukan di database.' };
+                    return { success: false, error: 'Produk "' + item.name + '" tidak ditemukan di database.' };
                 }
 
                 const currentStock = parseInt(productSnap.data().stock || 0);
                 if (currentStock < item.qty) {
                     return {
                         success: false,
-                        error: 'Stok tidak cukup untuk \"' + item.name + '\".Sisa: ' + currentStock + ', Diminta: ' + item.qty
+                        error: 'Stok tidak cukup untuk "' + item.name + '".Sisa: ' + currentStock + ', Diminta: ' + item.qty
                     };
                 }
             }
@@ -974,7 +974,6 @@ export const POSProvider = ({ children }) => {
                 const customerDoc = await getDoc(customerRef);
 
                 if (customerDoc.exists()) {
-                    const custData = customerDoc.data();
                     const updates = {
                         totalSpent: increment(-transactionData.total),
                         loyaltyPoints: increment(-(transactionData.pointsEarned || 0)),
