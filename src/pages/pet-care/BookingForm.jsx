@@ -182,12 +182,14 @@ const BookingForm = () => {
                 totalPrice, // Save Total Price
                 notes,
                 anamnesis: serviceType === 'clinic' ? anamnesis : [], // Save Anamnesis
-                status: isEdit ? undefined : (serviceType === 'grooming' ? 'pending' : 'confirmed'),
                 updatedAt: serverTimestamp(),
             };
 
+            // Only set status for new bookings
             if (!isEdit) {
+                bookingData.status = serviceType === 'grooming' ? 'pending' : 'confirmed';
                 bookingData.createdAt = serverTimestamp();
+
                 const docRef = await addDoc(collection(db, 'bookings'), bookingData);
 
                 // Update Room Status if Hotel

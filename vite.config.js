@@ -4,4 +4,14 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      '/api/ezviz': {
+        target: 'https://open.ezvizlife.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ezviz/, ''),
+        secure: false
+      }
+    }
+  }
 })

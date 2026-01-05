@@ -116,6 +116,7 @@ const Layout = () => {
             toggle: () => { }, // No toggle needed if always open, or reuse state
             children: [
                 { path: '/settings', label: 'Umum', icon: Settings },
+                { path: '/settings/cctv', label: 'CCTV / Kamera', icon: Activity },
                 // Role Management - Check Permission
                 ...((user?.role === 'admin' || user?.role === 'super_admin' || user?.permissions?.manage_roles) ? [
                     { path: '/settings/roles', label: 'Hak Akses (Roles)', icon: Shield }

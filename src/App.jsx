@@ -34,6 +34,8 @@ const CashFlow = React.lazy(() => import('./pages/pet-care/CashFlow'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const RoleList = React.lazy(() => import('./pages/settings/RoleList'));
 const RoleForm = React.lazy(() => import('./pages/settings/RoleForm'));
+const CCTVSettings = React.lazy(() => import('./pages/settings/CCTVSettings'));
+const CCTVViewer = React.lazy(() => import('./pages/CCTVViewer'));
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-slate-50">
@@ -61,6 +63,9 @@ function App() {
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+
+                {/* Public CCTV Viewer - No Auth Required */}
+                <Route path="/cctv/:token" element={<CCTVViewer />} />
 
                 <Route path="/" element={
                   <ProtectedRoute>
@@ -108,6 +113,7 @@ function App() {
                   <Route path="settings/roles" element={<RoleList />} />
                   <Route path="settings/roles/add" element={<RoleForm />} />
                   <Route path="settings/roles/:id" element={<RoleForm />} />
+                  <Route path="settings/cctv" element={<CCTVSettings />} />
                 </Route>
 
                 {/* Catch all */}

@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { Plus, Search, Edit, Trash2, Home, ChevronLeft, ChevronRight, Calculator, Calendar as CalendarIcon, List as ListIcon } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Home, ChevronLeft, ChevronRight, Calculator, Calendar as CalendarIcon, List as ListIcon, Camera } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
@@ -34,7 +34,11 @@ const Rooms = () => {
         type: 'Standard',
         capacity: 1,
         price: 0,
+        cameraSerial: '',
+        cameraChannel: 1
     });
+
+    const [devices, setDevices] = useState([]);
 
     const [activeTab, setActiveTab] = useState('grid'); // Default to grid for management
     const [bookings, setBookings] = useState([]);
@@ -45,6 +49,7 @@ const Rooms = () => {
     useEffect(() => {
         fetchRooms();
         fetchBookings();
+        fetchDevices();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storeId]);
 
@@ -62,6 +67,17 @@ const Rooms = () => {
             console.error("Error fetching rooms:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchDevices = async () => {
+        if (!storeId) return;
+        try {
+            const q = query(collection(db, 'cctv_devices'), where('storeId', '==', storeId));
+            const querySnapshot = await getDocs(q);
+            setDevices(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } catch (error) {
+            console.error("Error fetching CCTV devices:", error);
         }
     };
 
@@ -98,9 +114,13 @@ const Rooms = () => {
 
         // Parse numbers
         const submitData = {
-            ...formData,
-            capacity: parseInt(formData.capacity) || 0,
-            price: parseFloat(formData.price) || 0,
+            name: formData.name,
+            type: formData.type,
+            capacity: parseInt(formData.capacity),
+            price: parseInt(formData.price),
+            storeId,
+            cameraSerial: formData.cameraSerial || null,
+            cameraChannel: formData.cameraSerial ? parseInt(formData.cameraChannel || 1) : null,
         };
 
         try {
@@ -109,15 +129,14 @@ const Rooms = () => {
                 const roomRef = doc(db, 'rooms', currentRoom.id);
                 await updateDoc(roomRef, {
                     ...submitData,
-                    updatedAt: new Date(),
+                    updatedAt: new Date().toISOString(),
                 });
                 setIsEditOpen(false);
             } else {
                 // Create
                 await addDoc(collection(db, 'rooms'), {
                     ...submitData,
-                    storeId,
-                    createdAt: new Date(),
+                    createdAt: new Date().toISOString(),
                     status: 'available'
                 });
                 setIsAddOpen(false);
@@ -135,7 +154,9 @@ const Rooms = () => {
             name: room.name,
             type: room.type,
             capacity: room.capacity,
-            price: room.price
+            price: room.price,
+            cameraSerial: room.cameraSerial || '',
+            cameraChannel: room.cameraChannel || 1
         });
         setIsEditOpen(true);
     };
@@ -163,6 +184,8 @@ const Rooms = () => {
             type: 'Standard',
             capacity: 1,
             price: 0,
+            cameraSerial: '',
+            cameraChannel: 1
         });
     };
 
@@ -375,7 +398,17 @@ const Rooms = () => {
                                                         <div className="p-2 bg-slate-100 rounded-lg">
                                                             <Home className="h-4 w-4 text-slate-500" />
                                                         </div>
-                                                        {room.name}
+                                                        <div>
+                                                            <div className="font-medium">{room.name}</div>
+                                                            <div className="text-xs text-slate-500">{room.type}</div>
+                                                            {room.cameraSerial && (
+                                                                <div className="flex items-center gap-1 mt-1 text-[10px] text-indigo-600 bg-indigo-50 w-fit px-1.5 py-0.5 rounded">
+                                                                    <Camera className="h-3 w-3" />
+                                                                    {devices.find(d => d.serialNumber === room.cameraSerial)?.name || room.cameraSerial}
+                                                                    {room.cameraChannel > 1 && ` (Ch ${room.cameraChannel})`}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell><Badge variant="outline">{room.type}</Badge></TableCell>
@@ -457,6 +490,48 @@ const Rooms = () => {
                                 <Input id="price" name="price" type="number" min="0" value={Number.isNaN(formData.price) ? '' : formData.price} onChange={handleInputChange} required />
                             </div>
                         </div>
+
+                        <div className="space-y-4 pt-4 border-t">
+                            <h4 className="font-medium text-sm flex items-center gap-2">
+                                <Camera className="h-4 w-4" />
+                                Integrasi CCTV (Opsional)
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="cameraSerial">Pilih Device CCTV</Label>
+                                    <Select
+                                        value={formData.cameraSerial}
+                                        onValueChange={(value) => setFormData(prev => ({ ...prev, cameraSerial: value === 'none' ? '' : value }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Pilih camera..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Tidak ada</SelectItem>
+                                            {devices.map(device => (
+                                                <SelectItem key={device.id} value={device.serialNumber}>
+                                                    {device.name} ({device.serialNumber})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cameraChannel">Channel No.</Label>
+                                    <Input
+                                        id="cameraChannel"
+                                        name="cameraChannel"
+                                        type="number"
+                                        min="1"
+                                        disabled={!formData.cameraSerial}
+                                        value={formData.cameraChannel}
+                                        onChange={handleInputChange}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">Channel 1 untuk camera standalone.</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <DialogFooter>
                             <Button type="submit">{currentRoom ? 'Simpan Perubahan' : 'Buat Kamar'}</Button>
                         </DialogFooter>

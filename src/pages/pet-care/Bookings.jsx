@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { getAccessToken } from '../../services/ezvizService';
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, deleteDoc, doc, orderBy, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, deleteDoc, doc, orderBy, updateDoc, onSnapshot, getDoc, addDoc } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { usePOS } from '../../context/POSContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
@@ -10,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Label } from '../../components/ui/label';
-import { Calendar as CalendarIcon, Filter, LayoutGrid, List as ListIcon, Search, Plus, MoreHorizontal, Clock, User, ShoppingCart, Printer, MessageSquare } from 'lucide-react';
+import { Calendar as CalendarIcon, Filter, Search, Plus, MoreHorizontal, Clock, User, ShoppingCart, Printer, MessageSquare, Video, Link as LinkIcon, Copy, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { Badge } from '../../components/ui/badge';
@@ -24,197 +25,32 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import CalendarView from './CalendarView';
 import BookingInvoice from '../../components/BookingInvoice';
 import PetPaymentModal from '../../components/PetPaymentModal';
-import { DateRangePicker } from '../../components/DateRangePicker';
-
-// DnD Kit Imports
-import {
-    DndContext,
-    closestCorners,
-    KeyboardSensor,
-    PointerSensor,
-    useSensor,
-    useSensors,
-    DragOverlay,
-    defaultDropAnimationSideEffects
-} from '@dnd-kit/core';
-import {
-    SortableContext,
-    sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
-    useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-
-// --- Sub-Components ---
-
-const BookingCard = ({ booking, getPetName, getOwnerName, handleAssignGroomer, handleStatusChange, handleCheckout, handlePrintInvoice, handleDelete, navigate, isOverlay }) => {
-    return (
-        <Card className={`shadow-sm transition-all border-slate-200 ${isOverlay ? 'shadow-xl border-indigo-400 rotate-2 cursor-grabbing' : 'hover:shadow-md hover:border-indigo-300 cursor-grab active:cursor-grabbing'}`}>
-            <CardContent className="p-3">
-                <div className="flex justify-between items-start mb-2">
-                    <div>
-                        <div className="font-semibold">{getPetName(booking.petId)}</div>
-                        <div className="text-sm font-medium text-indigo-700">
-                            {booking.serviceType === 'grooming' ? (booking.serviceName || 'Grooming') :
-                                booking.serviceType === 'hotel' ? (booking.roomName || 'Hotel') :
-                                    'Klinik'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{getOwnerName(booking.ownerId)}</div>
-                    </div>
-                    {/* Hide Actions in Overlay to cleaner look, or keep them. Let's keep them hidden in overlay for performance/visuals */}
-                    {!isOverlay && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Ubah Status</DropdownMenuLabel>
-
-                                {(booking.serviceType === 'grooming' || booking.serviceType === 'clinic') && (
-                                    <>
-                                        <DropdownMenuItem onClick={() => handleAssignGroomer(booking)}>
-                                            <User className="mr-2 h-4 w-4" />
-                                            {booking.groomerName ? `Ganti: ${booking.groomerName}` : 'Pilih Dokter/Groomer'}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'pending')}>Terdaftar</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'processing')}>Proses</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'completed')}>Selesai</DropdownMenuItem>
-                                    </>
-                                )}
-
-                                {booking.serviceType === 'hotel' && (
-                                    <>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'confirmed')}>Terdaftar</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'checked_in')}>Check-In</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'checked_out')}>Check-Out</DropdownMenuItem>
-                                    </>
-                                )}
-
-                                <DropdownMenuSeparator />
-                                {booking.paymentStatus !== 'paid' && (
-                                    <DropdownMenuItem onClick={() => handleCheckout(booking)} className="text-indigo-600 font-medium">
-                                        <ShoppingCart className="mr-2 h-4 w-4" />
-                                        Bayar Tagihan
-                                    </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem onClick={() => navigate(`/pet-care/bookings/edit/${booking.id}`)}>Edit Reservasi</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handlePrintInvoice(booking)}>
-                                    <Printer className="mr-2 h-4 w-4" />
-                                    Cetak Invoice
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(booking)}>Hapus</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
-                </div>
-
-                <div className="space-y-1 mb-3">
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                        <CalendarIcon className="h-3 w-3" />
-                        {format(new Date(booking.startDate), 'dd MMM', { locale: idLocale })}
-                        {booking.serviceType === 'hotel' && booking.endDate && ` - ${format(new Date(booking.endDate), 'dd MMM', { locale: idLocale })}`}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                        <Clock className="h-3 w-3" />
-                        {booking.startTime}
-                    </div>
-                </div>
-
-                {booking.notes && (
-                    <div className="mb-3 p-2 bg-amber-50 text-amber-900 text-xs rounded-md border border-amber-100 flex items-start gap-2">
-                        <MessageSquare className="h-3 w-3 shrink-0 mt-0.5" />
-                        <span className="line-clamp-2">{booking.notes}</span>
-                    </div>
-                )}
-
-                <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="text-xs font-normal">
-                        {booking.serviceType === 'hotel' ? 'Hotel' : booking.serviceType === 'clinic' ? 'Klinik' : 'Grooming'}
-                    </Badge>
-                    {booking.groomerName && (
-                        <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full flex items-center">
-                            <User className="h-3 w-3 mr-1" />
-                            {booking.groomerName}
-                        </span>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
-
-const SortableBookingItem = ({ booking, ...props }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging
-    } = useSortable({ id: booking.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.3 : 1, // Dim when dragging
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-            <BookingCard booking={booking} {...props} />
-        </div>
-    );
-};
-
-
-const KanbanColumn = ({ status, label, items, children }) => {
-    const { setNodeRef } = useSortable({ id: status }); // Make column droppable
-
-    return (
-        <div
-            ref={setNodeRef}
-            className="flex flex-col gap-4 min-w-[300px] w-full bg-slate-50/50 p-4 rounded-xl border border-slate-100 transition-colors"
-        >
-            <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-sm text-slate-700 uppercase tracking-wider">{label}</h3>
-                <Badge variant="secondary" className="bg-white">{items.length}</Badge>
-            </div>
-            <div className="flex flex-col gap-3 h-full min-h-[100px]">
-                {items.length === 0 && (
-                    <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-lg">
-                        Drop / Kosong
-                    </div>
-                )}
-                {children}
-            </div>
-        </div>
-    );
-};
-
 
 // --- Main Component ---
 
 const Bookings = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const { storeId } = user;
+
+    // CCTV Link State
+    const [cctvLink, setCctvLink] = useState(null);
+    const [isCctvDialogOpen, setIsCctvDialogOpen] = useState(false);
+    const [cctvCopied, setCctvCopied] = useState(false);
+
     const { customers } = usePOS();
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [bookingToDelete, setBookingToDelete] = useState(null);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-    const [viewMode, setViewMode] = useState('list');
-    const [filterServiceType, setFilterServiceType] = useState('all');
 
+    // Filters
+    const [filterServiceType, setFilterServiceType] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
-    const [dateRange, setDateRange] = useState({ from: undefined, to: undefined });
+
     const [pets, setPets] = useState([]);
     const [staffList, setStaffList] = useState([]);
     const [invoiceData, setInvoiceData] = useState(null);
@@ -228,10 +64,6 @@ const Bookings = () => {
     const [selectedBookingForAssign, setSelectedBookingForAssign] = useState(null);
     const [selectedGroomerId, setSelectedGroomerId] = useState('');
 
-    // DnD State
-    const [activeId, setActiveId] = useState(null);
-
-    const storeId = user?.storeId;
     const [dataStoreId, setDataStoreId] = useState(storeId);
 
     if (storeId !== dataStoreId) {
@@ -356,7 +188,6 @@ const Bookings = () => {
 
     const handleStatusChange = async (bookingId, newStatus) => {
         try {
-            // Optimistic update already happened in UI if Dragged, but we need to ensure DB update
             await updateDoc(doc(db, 'bookings', bookingId), { status: newStatus });
 
             // Sync Hotel Room Status
@@ -371,101 +202,110 @@ const Bookings = () => {
                     await updateDoc(roomRef, { status: 'available', currentOccupantId: null });
                 }
             }
-
-            // Note: onSnapshot will refresh the list, so we might not needed manual SetBookings here 
-            // if we trust Realtime. But keeping it for instant feedback if onSnapshot is slow.
-            // Currently dnd-kit modifies local state 'bookings' too.
         } catch (error) {
             console.error("Error updating status:", error);
         }
     };
 
-    // --- DnD Logic ---
-    const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
-    );
+    const handleGenerateCCTV = async (booking) => {
+        if (!booking.roomId) {
+            alert("Booking ini tidak memiliki data kamar.");
+            return;
+        }
 
-    const handleDragStart = (event) => {
-        setActiveId(event.active.id);
-    };
 
-    const handleDragOver = (event) => {
-        const { active, over } = event;
-        if (!over) return;
+        try {
+            // Check if room has camera
+            const roomRef = doc(db, 'rooms', booking.roomId);
+            const roomSnap = await getDoc(roomRef);
 
-        const activeId = active.id;
-        const overId = over.id;
-
-        // Find the containers
-        const activeBooking = bookings.find(b => b.id === activeId);
-        if (!activeBooking) return;
-
-        // Over could be a column OR another item
-        // If over is a column (status string), that's the new status.
-        // If over is an item, we need its status.
-        let newStatus = null;
-
-        // Check if over.id is a known status column
-        const isOverColumn = ['pending', 'processing', 'completed', 'confirmed', 'checked_in', 'checked_out'].includes(overId);
-
-        if (isOverColumn) {
-            newStatus = overId;
-        } else {
-            const overBooking = bookings.find(b => b.id === overId);
-            if (overBooking) {
-                newStatus = overBooking.status;
+            if (!roomSnap.exists()) {
+                alert("Data kamar tidak ditemukan.");
+                return;
             }
-        }
 
-        if (newStatus && activeBooking.status !== newStatus) {
-            // Optimistic Update during Drag
-            setBookings((items) => {
-                return items.map(item =>
-                    item.id === activeId ? { ...item, status: newStatus } : item
-                );
-            });
+            const roomData = roomSnap.data();
+            if (!roomData.cameraSerial) {
+                alert(`Kamar "${roomData.name}" belum terhubung dengan CCTV. Silakan setting di menu Ketersediaan Kamar.`);
+                return;
+            }
+
+            // Fetch EZVIZ Access Token
+            let ezvizToken = '';
+            try {
+                const settingsRef = doc(db, 'cctv_settings', booking.storeId);
+                const settingsSnap = await getDoc(settingsRef);
+
+                if (settingsSnap.exists()) {
+                    const settings = settingsSnap.data();
+                    if (settings.appKey && settings.appSecret) {
+                        const tokenResponse = await getAccessToken(settings.appKey, settings.appSecret);
+                        if (tokenResponse.code === '200' && tokenResponse.data) {
+                            ezvizToken = tokenResponse.data.accessToken;
+                        } else {
+                            console.warn("EZVIZ Token Error:", tokenResponse);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch EZVIZ token:", err);
+                // Continue anyway, but stream might not work for private devices
+            }
+
+            // Check existing token
+            const tokensQ = query(
+                collection(db, 'cctv_tokens'),
+                where('bookingId', '==', booking.id)
+            );
+            const tokensSnap = await getDocs(tokensQ);
+
+            let token = '';
+
+            if (!tokensSnap.empty) {
+                // Use existing token
+                const data = tokensSnap.docs[0].data();
+                token = data.token;
+
+                // Update expiry if needed (extend to current checkout date)
+                await updateDoc(doc(db, 'cctv_tokens', tokensSnap.docs[0].id), {
+                    validUntil: booking.endDate,
+                    ezvizToken: ezvizToken || data.ezvizToken // Update token if new one fetched
+                });
+            } else {
+                // Generate new token
+                token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+                await addDoc(collection(db, 'cctv_tokens'), {
+                    token,
+                    bookingId: booking.id,
+                    roomId: booking.roomId,
+                    storeId: booking.storeId,
+                    ezvizToken,
+                    createdAt: new Date().toISOString(),
+                    validUntil: booking.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Default 7 days if no end date
+                });
+            }
+
+            // Generate full URL
+            const url = `${window.location.origin}/cctv/${token}`;
+            setCctvLink(url);
+            setIsCctvDialogOpen(true);
+            setCctvCopied(false);
+
+        } catch (error) {
+            console.error("Error generating CCTV link:", error);
+            alert("Gagal membuat link CCTV.");
         }
     };
 
-    const handleDragEnd = (event) => {
-        const { active, over } = event;
-        setActiveId(null);
-
-        if (!over) return;
-
-        const activeBooking = bookings.find(b => b.id === active.id);
-        const overId = over.id;
-        let newStatus = null;
-
-        const isOverColumn = ['pending', 'processing', 'completed', 'confirmed', 'checked_in', 'checked_out'].includes(overId);
-
-        if (isOverColumn) {
-            newStatus = overId;
-        } else {
-            const overBooking = bookings.find(b => b.id === overId);
-            if (overBooking) newStatus = overBooking.status;
-        }
-
-        // Only update DB if status changed
-        // Note: activeBooking.status MIGHT already be the NEW status because handleDragOver updated it optimistically.
-        // So we need to be careful. dnd-kit's 'active' prop in DragEnd might hold the INITIAL state or current? 
-        // Actually, 'bookings' state is updated. 'activeBooking' above is from the *updated* bookings state.
-        // So activeBooking.status IS the new status.
-        // We just need to persist it.
-
-        if (activeBooking && newStatus) {
-            handleStatusChange(activeBooking.id, newStatus);
+    const copyToClipboard = () => {
+        if (cctvLink) {
+            navigator.clipboard.writeText(cctvLink);
+            setCctvCopied(true);
+            setTimeout(() => setCctvCopied(false), 2000);
         }
     };
 
-    // --- Render Logic ---
 
     const filteredBookings = bookings.filter(booking => {
         const petName = getPetName(booking.petId).toLowerCase();
@@ -477,25 +317,20 @@ const Bookings = () => {
             ? true
             : booking.serviceType === filterServiceType;
 
-        const matchesDate = viewMode === 'calendar' ? true : (
-            (!dateRange?.from || !dateRange?.to) ? true :
-                (new Date(booking.startDate) >= new Date(dateRange.from) && new Date(booking.startDate) <= new Date(dateRange.to))
-        );
-
         const matchesStatus = filterStatus === 'all'
             ? true
             : booking.status === filterStatus;
 
-        return matchesSearch && matchesType && matchesDate && matchesStatus;
+        return matchesSearch && matchesType && matchesStatus;
     });
 
     const getStatusLabel = (status) => {
         switch (status) {
-            case 'pending': return 'Terdaftar / Menunggu';
+            case 'pending': return 'Terdaftar';
             case 'processing': return 'Sedang Proses';
             case 'confirmed': return 'Terdaftar';
             case 'checked_in': return 'Check-In';
-            case 'checked_out': return 'Check-Out / Selesai';
+            case 'checked_out': return 'Check-Out';
             case 'completed': return 'Selesai';
             case 'cancelled': return 'Batal';
             default: return status;
@@ -515,108 +350,62 @@ const Bookings = () => {
         }
     };
 
-    const groomingColumns = [
-        { id: 'pending', label: 'Terdaftar' },
-        { id: 'processing', label: 'Proses' },
-        { id: 'completed', label: 'Selesai' },
-    ];
-
-    const hotelColumns = [
-        { id: 'confirmed', label: 'Terdaftar' },
-        { id: 'checked_in', label: 'Check-In' },
-        { id: 'checked_out', label: 'Check-Out' },
-    ];
-
-    const allColumns = [
-        ...groomingColumns,
-        ...hotelColumns.filter(c => !groomingColumns.some(gc => gc.id === c.id))
-    ];
-
-    const visibleColumns = filterServiceType === 'grooming' || filterServiceType === 'clinic' ? groomingColumns :
-        filterServiceType === 'hotel' ? hotelColumns :
-            allColumns;
-
-
-    const renderContent = () => {
-        if (viewMode === 'calendar') {
-            return (
-                <div className="flex-1 h-full overflow-hidden">
-                    <CalendarView bookings={filteredBookings} onSelectBooking={(b) => navigate(`/pet-care/bookings/edit/${b.id}`)} />
+    return (
+        <div className="p-6 space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Bookings Admin</h1>
+                    <p className="text-muted-foreground">Kelola semua reservasi dan booking secara terpusat.</p>
                 </div>
-            );
-        }
+                <Button onClick={() => navigate('/pet-care/bookings/new')} className="bg-indigo-600 hover:bg-indigo-700">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Booking Baru
+                </Button>
+            </div>
 
-        if (viewMode === 'board') {
-            const activeBooking = bookings.find(b => b.id === activeId);
-
-            return (
-                <div className="flex-1 overflow-x-auto pb-4">
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCorners}
-                        onDragStart={handleDragStart}
-                        onDragOver={handleDragOver}
-                        onDragEnd={handleDragEnd}
-                    >
-                        <div className="flex gap-4 h-full min-w-max">
-                            {visibleColumns.map(col => {
-                                const colItems = filteredBookings.filter(b => b.status === col.id);
-                                return (
-                                    <KanbanColumn
-                                        key={col.id}
-                                        status={col.id}
-                                        label={col.label}
-                                        items={colItems}
-                                    >
-                                        <SortableContext
-                                            items={colItems.map(item => item.id)}
-                                            strategy={verticalListSortingStrategy}
-                                        >
-                                            {colItems.map(booking => (
-                                                <SortableBookingItem
-                                                    key={booking.id}
-                                                    booking={booking}
-                                                    getPetName={getPetName}
-                                                    getOwnerName={getOwnerName}
-                                                    handleAssignGroomer={handleAssignGroomer}
-                                                    handleStatusChange={handleStatusChange}
-                                                    handleCheckout={handleCheckout}
-                                                    handlePrintInvoice={handlePrintInvoice}
-                                                    handleDelete={handleDelete}
-                                                    navigate={navigate}
-                                                />
-                                            ))}
-                                        </SortableContext>
-                                    </KanbanColumn>
-                                );
-                            })}
+            <Card>
+                <CardHeader className="pb-3 border-b">
+                    <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+                        <div className="flex items-center gap-2 w-full md:w-auto text-muted-foreground">
+                            <ListIcon className="w-5 h-5 text-indigo-600" />
+                            <h3 className="font-semibold text-slate-800">Daftar Reservasi</h3>
                         </div>
-                        <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }) }}>
-                            {activeBooking ? (
-                                <BookingCard
-                                    booking={activeBooking}
-                                    getPetName={getPetName}
-                                    getOwnerName={getOwnerName}
-                                    // Pass dummy handlers or same handlers
-                                    handleAssignGroomer={() => { }}
-                                    handleStatusChange={() => { }}
-                                    handleCheckout={() => { }}
-                                    handlePrintInvoice={() => { }}
-                                    handleDelete={() => { }}
-                                    navigate={() => { }}
-                                    isOverlay={true}
+                        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                <Input
+                                    placeholder="Cari Pet / Owner..."
+                                    className="pl-9 w-full md:w-[250px]"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
                                 />
-                            ) : null}
-                        </DragOverlay>
-                    </DndContext>
-                </div>
-            );
-        }
-
-        // List View
-        return (
-            <Card className="flex-1 overflow-hidden flex flex-col">
-                <CardContent className="p-0 flex-1 overflow-auto">
+                            </div>
+                            <Select value={filterServiceType} onValueChange={setFilterServiceType}>
+                                <SelectTrigger className="w-[140px]">
+                                    <SelectValue placeholder="Semua Layanan" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Semua Layanan</SelectItem>
+                                    <SelectItem value="grooming">Grooming</SelectItem>
+                                    <SelectItem value="hotel">Pet Hotel</SelectItem>
+                                    <SelectItem value="clinic">Klinik</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Select value={filterStatus} onValueChange={setFilterStatus}>
+                                <SelectTrigger className="w-[140px]">
+                                    <SelectValue placeholder="Semua Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Semua Status</SelectItem>
+                                    <SelectItem value="pending">Terdaftar</SelectItem>
+                                    <SelectItem value="checked_in">Check-In</SelectItem>
+                                    <SelectItem value="completed">Selesai</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -636,7 +425,7 @@ const Bookings = () => {
                             ) : filteredBookings.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                        Belum ada reservasi.
+                                        Data tidak ditemukan.
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -682,33 +471,34 @@ const Bookings = () => {
                                                                 <User className="mr-2 h-4 w-4" />
                                                                 {booking.groomerName ? `Ganti: ${booking.groomerName}` : 'Pilih Dokter/Groomer'}
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'pending')}>Terdaftar</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'processing')}>Proses</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'completed')}>Selesai</DropdownMenuItem>
                                                         </>
                                                     )}
 
-                                                    {booking.serviceType === 'hotel' && (
-                                                        <>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'confirmed')}>Terdaftar</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'checked_in')}>Check-In</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleStatusChange(booking.id, 'checked_out')}>Check-Out</DropdownMenuItem>
-                                                        </>
+                                                    {booking.serviceType === 'hotel' && booking.roomId && (
+                                                        <DropdownMenuItem onClick={() => handleGenerateCCTV(booking)}>
+                                                            <Video className="mr-2 h-4 w-4" />
+                                                            Link CCTV
+                                                        </DropdownMenuItem>
                                                     )}
 
                                                     <DropdownMenuSeparator />
                                                     {booking.paymentStatus !== 'paid' && (
-                                                        <DropdownMenuItem onClick={() => handleCheckout(booking)} className="text-indigo-600 font-medium">
+                                                        <DropdownMenuItem onClick={() => handleCheckout(booking)} className="text-indigo-600">
                                                             <ShoppingCart className="mr-2 h-4 w-4" />
-                                                            Bayar Tagihan
+                                                            Bayar
                                                         </DropdownMenuItem>
                                                     )}
                                                     <DropdownMenuItem onClick={() => handlePrintInvoice(booking)}>
                                                         <Printer className="mr-2 h-4 w-4" />
-                                                        Cetak Invoice
+                                                        Invoice
                                                     </DropdownMenuItem>
+
+                                                    {booking.status !== 'cancelled' && (
+                                                        <DropdownMenuItem className="text-red-500" onClick={() => handleStatusChange(booking.id, 'cancelled')}>
+                                                            Batalkan Reservasi
+                                                        </DropdownMenuItem>
+                                                    )}
+
                                                     <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(booking)}>Hapus</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -720,165 +510,24 @@ const Bookings = () => {
                     </Table>
                 </CardContent>
             </Card>
-        );
-    };
 
-    return (
-        <div className="p-6 w-full space-y-6 h-[calc(100vh-4rem)] flex flex-col">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Daftar Reservasi</h1>
-                    <p className="text-muted-foreground">Jadwal kedatangan dan booking pelanggan.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button onClick={() => navigate('/pet-care/bookings/add')}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Buat Reservasi
-                    </Button>
-                </div>
-            </div>
-
-            <Tabs defaultValue="all" value={filterServiceType} onValueChange={setFilterServiceType} className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4 shrink-0">
-                    <TabsList>
-                        <TabsTrigger value="all">Semua</TabsTrigger>
-                        <TabsTrigger value="hotel">Pet Hotel</TabsTrigger>
-                        <TabsTrigger value="grooming">Grooming</TabsTrigger>
-                        <TabsTrigger value="clinic">Klinik</TabsTrigger>
-                    </TabsList>
-
-                    <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto items-center">
-                        {/* Date Filter */}
-                        {viewMode !== 'calendar' && (
-                            <DateRangePicker
-                                date={dateRange}
-                                setDate={setDateRange}
-                            />
-                        )}
-
-                        {/* Status Filter */}
-                        <Select value={filterStatus} onValueChange={setFilterStatus}>
-                            <SelectTrigger className="w-[180px] bg-white">
-                                <Filter className="w-4 h-4 mr-2" />
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Semua Status</SelectItem>
-                                <SelectItem value="pending">Terdaftar</SelectItem>
-                                <SelectItem value="processing">Sedang Proses</SelectItem>
-                                <SelectItem value="checked_in">Check-In</SelectItem>
-                                <SelectItem value="checked_out">Check-Out</SelectItem>
-                                <SelectItem value="completed">Selesai</SelectItem>
-                                <SelectItem value="cancelled">Dibatalkan</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <div className="relative flex-1 md:w-64">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="search"
-                                placeholder="Cari nama hewan..."
-                                className="pl-8 bg-white"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        {/* View Mode Toggle */}
-                        <div className="flex bg-slate-100 p-1 rounded-lg border">
-                            <Button
-                                variant={viewMode === 'board' ? 'white' : 'ghost'}
-                                size="sm"
-                                className={`h-8 px-3 ${viewMode === 'board' ? 'bg-white shadow-sm' : ''}`}
-                                onClick={() => setViewMode('board')}
-                            >
-                                <LayoutGrid className="h-4 w-4 mr-2" />
-                                Board
-                            </Button>
-                            <Button
-                                variant={viewMode === 'list' ? 'white' : 'ghost'}
-                                size="sm"
-                                className={`h-8 px-3 ${viewMode === 'list' ? 'bg-white shadow-sm' : ''}`}
-                                onClick={() => setViewMode('list')}
-                            >
-                                <ListIcon className="h-4 w-4 mr-2" />
-                                List
-                            </Button>
-                            <Button
-                                variant={viewMode === 'calendar' ? 'white' : 'ghost'}
-                                size="sm"
-                                className={`h-8 px-3 ${viewMode === 'calendar' ? 'bg-white shadow-sm' : ''}`}
-                                onClick={() => setViewMode('calendar')}
-                            >
-                                <CalendarIcon className="h-4 w-4 mr-2" />
-                                Kalender
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-hidden">
-                    <TabsContent value="all" className="h-full mt-0">
-                        {renderContent()}
-                    </TabsContent>
-                    <TabsContent value="hotel" className="h-full mt-0">
-                        {renderContent()}
-                    </TabsContent>
-                    <TabsContent value="grooming" className="h-full mt-0">
-                        {renderContent()}
-                    </TabsContent>
-                    <TabsContent value="clinic" className="h-full mt-0">
-                        {renderContent()}
-                    </TabsContent>
-                </div>
-            </Tabs>
-
-
+            {/* Modals */}
             <ConfirmDialog
                 isOpen={isDeleteOpen}
                 onClose={() => setIsDeleteOpen(false)}
                 onConfirm={confirmDelete}
                 title="Hapus Reservasi"
-                description="Apakah Anda yakin ingin menghapus reservasi ini?"
-                confirmText="Hapus"
-                variant="destructive"
+                message="Apakah Anda yakin ingin menghapus reservasi ini? Data yang dihapus tidak dapat dikembalikan."
             />
 
-            {
-                invoiceData && (
-                    <BookingInvoice
+            <Dialog open={!!invoiceData} onOpenChange={(open) => !open && setInvoiceData(null)}>
+                <DialogContent className="max-w-3xl h-[90vh] overflow-y-auto">
+                    {invoiceData && <BookingInvoice
                         booking={invoiceData.booking}
                         transaction={invoiceData.transaction}
                         customer={invoiceData.customer}
                         store={invoiceData.store}
-                        onClose={() => setInvoiceData(null)}
-                    />
-                )
-            }
-
-            <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Pilih Groomer / Staff</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label>Pilih Staff</Label>
-                            <Select value={selectedGroomerId} onValueChange={setSelectedGroomerId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Pilih Staff..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {staffList.map(s => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name || s.email} ({s.role})</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAssignOpen(false)}>Batal</Button>
-                        <Button onClick={saveGroomerAssignment} disabled={!selectedGroomerId}>Simpan</Button>
-                    </DialogFooter>
+                    />}
                 </DialogContent>
             </Dialog>
 
@@ -888,7 +537,49 @@ const Bookings = () => {
                 booking={paymentBooking}
                 onSuccess={handlePaymentSuccess}
             />
-        </div >
+
+            <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Pilih Petugas / Dokter</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Label className="mb-2 block">Pilih Staff</Label>
+                        <Select value={selectedGroomerId} onValueChange={setSelectedGroomerId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Pilih Staff..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {staffList.map(staff => (
+                                    <SelectItem key={staff.id} value={staff.id}>
+                                        {staff.name} ({staff.role})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAssignOpen(false)}>Batal</Button>
+                        <Button onClick={saveGroomerAssignment}>Simpan</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isCctvDialogOpen} onOpenChange={setIsCctvDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Link CCTV Publik</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex items-center space-x-2 my-4">
+                        <Input value={cctvLink || ''} readOnly className="select-all" />
+                        <Button size="icon" onClick={copyToClipboard}>
+                            {cctvCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+        </div>
     );
 };
 
